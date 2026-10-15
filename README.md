@@ -58,8 +58,6 @@ Discover shows a UCR campus map. Study Circles and Profile provide starting scre
 4. Start Django with `runserver 0.0.0.0:8000`, then restart Expo after changing environment variables.
 5. Open `http://YOUR_COMPUTER_LAN_IP:8000/api/v1/health/` in the phone's browser to check connectivity. If it fails, check firewall access and Wi-Fi client isolation.
 
-Use `localhost` for the iOS simulator and `10.0.2.2` for the Android emulator. The backend environment example allows both; if you already have a backend `.env`, add `10.0.2.2` to `DJANGO_ALLOWED_HOSTS`. Expo's tunnel option only tunnels Metro; it does not expose Django. Public `EXPO_PUBLIC_*` variables are bundled into the app: never put secrets in them.
-
 ## Checks
 
 From `backend/`, with the environment activated:
@@ -78,20 +76,8 @@ npm run typecheck
 npm run check
 ```
 
-JavaScript files use TypeScript's `checkJs` for static checks; app code remains JavaScript.
-
-The installed Expo dependency tree currently reports 29 npm audit advisories (19 high, 10 moderate), including transitive dependencies. Compatible `npm audit fix` updates were applied; remaining suggested fixes require breaking dependency changes. Reassess these before deployment.
-
-## Database and deployment configuration
-
-Leaving `DATABASE_URL` blank uses the ignored local `backend/db.sqlite3`. To use PostgreSQL, create a database and set a URL such as `postgresql://USER:PASSWORD@HOST:5432/studyscotty`. The PostgreSQL driver is included. Apply the same migrations with `python manage.py migrate`.
-
-Before deployment, set `DJANGO_DEBUG=false`, a unique random `DJANGO_SECRET_KEY`, explicit allowed hosts, and the required database SSL options in `DATABASE_URL`. Hosting, production serving, HTTPS, and photo storage are still to be selected; Django's development server is for local use.
-
 ## Project documents
 
 - [Agent guidance](AGENTS.md)
 - [API contract and pending decisions](docs/api-contract.md)
 - [Database architecture](docs/database.md)
-
-This is the initial scaffold. Registration/login, UCR verification, spot CRUD, photo upload, ratings, favorites, busyness, session/RSVP logic, and reminder flows are not implemented yet.
