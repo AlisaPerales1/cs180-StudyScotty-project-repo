@@ -1,0 +1,21 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.sqlite3
+*.sqlite3-*
+backend/media/
+backend/staticfiles/
+# Expo and Node
+node_modules/
+.expo/
+dist/
+web-build/
+# Editors and OS
+.DS_Store
+.vscode/
+.idea/
