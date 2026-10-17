@@ -81,3 +81,6 @@ npm run check
 - [Agent guidance](AGENTS.md)
 - [API contract and pending decisions](docs/api-contract.md)
 - [Database architecture](docs/database.md)
+- Database ERD Schema:
+<img width="5666" height="4571" alt="image" src="https://github.com/user-attachments/assets/a20e07da-694e-48b5-b8dd-9a9fc6c8aec1" />
+
