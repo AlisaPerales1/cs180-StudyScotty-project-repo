@@ -1,3 +1,5 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import StudySession, RSVP, SessionCheckIn
+
+admin.site.register([StudySession, RSVP, SessionCheckIn])
