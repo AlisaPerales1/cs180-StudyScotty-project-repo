@@ -80,4 +80,7 @@ npm run check
 
 - [Agent guidance](AGENTS.md)
 - [API contract and pending decisions](docs/api-contract.md)
-- [Database architecture](docs/database.md)
+- [Database architecture and connection setup](docs/database.md)
+- [Source database ERD](docs/erd.dbml)
+
+The backend models and migrations implement all 15 ERD tables. Run `python manage.py migrate` from `backend/` to create or update the configured database. A blank `DATABASE_URL` uses SQLite; set a PostgreSQL URL in `backend/.env` to connect to a provisioned server. See the database architecture document for constraints, deletion policies, and remaining feature logic.

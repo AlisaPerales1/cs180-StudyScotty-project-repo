@@ -21,9 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 import os
 
-import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+
+from .database import database_config
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -97,9 +98,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": dj_database_url.parse(
-        os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=0 if DEBUG else 600,
+    "default": database_config(
+        os.getenv("DATABASE_URL"), base_dir=BASE_DIR, debug=DEBUG,
     )
 }
 AUTH_USER_MODEL = "accounts.User"
