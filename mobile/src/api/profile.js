@@ -5,6 +5,10 @@
  * authentication are agreed in docs/api-contract.md. Screens should only use
  * getProfile/updateProfile so the real API can replace this file's internals.
  * Edits persist while the app is running and reset on reload.
+ *
+ * Fields mirror the database (docs/database.md): username, email, first_name,
+ * and last_name come from accounts.User; study_preferences comes from
+ * accounts.UserProfile.
  */
 
 /**
@@ -13,16 +17,18 @@
  *   email: string,
  *   first_name: string,
  *   last_name: string,
- *   major: string,
- *   graduation_year: number | null,
- *   bio: string,
+ *   study_preferences: string,
  * }} Profile
  */
 
-/** Fields the user may change; username and email are read-only. */
-export const EDITABLE_FIELDS = ['first_name', 'last_name', 'major', 'graduation_year', 'bio'];
+/**
+ * Fields the user may change. Username and email are read-only until login
+ * and UCR email verification are agreed.
+ */
+export const EDITABLE_FIELDS = ['first_name', 'last_name', 'study_preferences'];
 
-export const BIO_MAX_LENGTH = 300;
+/** Matches Django's AbstractUser first_name/last_name max_length. */
+export const NAME_MAX_LENGTH = 150;
 
 /** @type {Profile} */
 let mockProfile = {
@@ -30,9 +36,7 @@ let mockProfile = {
   email: 'scotty@ucr.edu',
   first_name: 'Scotty',
   last_name: 'Highlander',
-  major: 'Computer Science',
-  graduation_year: 2028,
-  bio: '',
+  study_preferences: '',
 };
 
 const MOCK_LATENCY_MS = 400;
