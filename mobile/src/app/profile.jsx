@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NAME_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
+import ActionButton from '../components/ActionButton';
 import ConnectionStatus from '../components/ConnectionStatus';
 import Screen from '../components/Screen';
 
@@ -156,26 +157,6 @@ function Field({ label, error, multiline, ...inputProps }) {
   );
 }
 
-/** @param {{ title: string, onPress: () => void, disabled?: boolean, variant?: 'primary' | 'secondary' }} props */
-function ActionButton({ title, onPress, disabled, variant = 'primary' }) {
-  const secondary = variant === 'secondary';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.button,
-        secondary && styles.buttonSecondary,
-        (pressed || disabled) && { opacity: 0.6 },
-      ]}
-    >
-      <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{title}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   card: { padding: 20, gap: 14, backgroundColor: 'white', borderRadius: 16 },
   name: { fontSize: 22, fontWeight: '700', color: '#142d4e' },
@@ -191,9 +172,5 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#c0392b' },
   error: { color: '#c0392b', fontSize: 13 },
   actions: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end' },
-  button: { backgroundColor: '#2463a0', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center' },
-  buttonSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#2463a0' },
-  buttonText: { color: 'white', fontWeight: '600', fontSize: 16 },
-  buttonTextSecondary: { color: '#2463a0' },
   message: { color: '#2463a0' },
 });
