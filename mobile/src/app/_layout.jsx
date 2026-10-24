@@ -43,6 +43,11 @@ export default function RootLayout() {
             tabBarStyle: { display: 'none' },
           }}
         />
+
+        <Tabs.Screen
+          name="spots/[id]/reviews"
+          options={{ href: null }}
+        />
       </Tabs>
     </>
   );
