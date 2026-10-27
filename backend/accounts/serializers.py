@@ -31,6 +31,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
 
         return email
+    def create(self, validated_data):
+            password = validated_data.pop("password")
+            user = User(**validated_data)
+            user.set_password(password)
+            user.save()
+            return user 
 
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken

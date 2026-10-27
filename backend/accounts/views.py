@@ -2,7 +2,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, LoginSerializer
+from rest_framework.views import APIView
 
 User = get_user_model()
 
@@ -26,4 +27,19 @@ class RegisterView(generics.CreateAPIView):
                 },
             },
             status=status.HTTP_201_CREATED,
+        )
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        return Response(
+            serializer.validated_data,
+            status=status.HTTP_200_OK,
         )

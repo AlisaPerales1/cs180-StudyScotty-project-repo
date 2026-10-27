@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { signup } from '../api/auth';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -18,55 +19,62 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = () => {
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !password ||
-      !confirmPassword
-    ) {
-      Alert.alert('Error', 'Please fill in all fields.');
-      return;
-    }
+  const handleSignup = async () => {
+  if (
+    !name.trim() ||
+    !email.trim() ||
+    !password ||
+    !confirmPassword
+  ) {
+    Alert.alert('Error', 'Please fill in all fields.');
+    return;
+  }
 
-    const ucrEmailRegex = /^[^\s@]+@ucr\.edu$/i;
+  const ucrEmailRegex = /^[^\s@]+@ucr\.edu$/i;
 
-    if (!ucrEmailRegex.test(email.trim())) {
-      Alert.alert(
-        'Invalid Email',
-        'Please use a valid UCR email address.'
-      );
-      return;
-    }
-
-    if (password.length < 8) {
-      Alert.alert(
-        'Weak Password',
-        'Password must be at least 8 characters long.'
-      );
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert(
-        'Password Mismatch',
-        'Passwords do not match.'
-      );
-      return;
-    }
-
+  if (!ucrEmailRegex.test(email.trim())) {
     Alert.alert(
-      'Form Validated',
-      'Your information is valid. Account creation will be enabled when the backend is connected.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/login'),
-        },
-      ]
+      'Invalid Email',
+      'Please use a valid UCR email address.'
     );
-  };
+    return;
+  }
+
+  if (password.length < 8) {
+    Alert.alert(
+      'Weak Password',
+      'Password must be at least 8 characters long.'
+    );
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    Alert.alert(
+      'Password Mismatch',
+      'Passwords do not match.'
+    );
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    await signup(name.trim(), email, password);
+
+    // Registration succeeded; login is a separate step.
+    // Email ownership verification is not implemented yet.
+    router.replace('/login');
+  } catch (error) {
+    Alert.alert(
+      'Sign Up Failed',
+      error.message || 'Unable to create your account.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ScrollView
@@ -77,11 +85,12 @@ export default function SignupScreen() {
       <Text style={styles.subtitle}>Create Your Account</Text>
 
       <TextInput
-        style={styles.input}
-        placeholder="Full Name"
-        autoCapitalize="words"
-        value={name}
-        onChangeText={setName}
+      style={styles.input}
+      placeholder="Username"
+      autoCapitalize="none"
+      autoCorrect={false}
+      value={name}
+      onChangeText={setName}
       />
 
       <TextInput
@@ -111,11 +120,14 @@ export default function SignupScreen() {
       />
 
       <TouchableOpacity
-        style={styles.button}
-        onPress={handleSignup}
+      style={styles.button}
+      onPress={handleSignup}
+      disabled={loading}
       >
-        <Text style={styles.buttonText}>Create Account</Text>
-      </TouchableOpacity>
+  <Text style={styles.buttonText}>
+    {loading ? 'Creating Account...' : 'Create Account'}
+  </Text>
+</TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => router.replace('/login')}
