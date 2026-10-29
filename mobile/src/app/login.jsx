@@ -43,7 +43,7 @@ export default function LoginScreen() {
     console.log('Login successful for:', response.user?.username);
 
     // Navigate to the Discover screen after successful login
-    router.replace('/');
+    router.replace('/discover');
   } catch (error) {
     Alert.alert(
       'Login Failed',
