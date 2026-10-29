@@ -42,10 +42,8 @@ export default function LoginScreen() {
     // We'll add secure token storage and authenticated navigation next.
     console.log('Login successful for:', response.user?.username);
 
-    Alert.alert(
-      'Login Successful',
-      'Your credentials were verified by Django.'
-    );
+    // Navigate to the Discover screen after successful login
+    router.replace('/');
   } catch (error) {
     Alert.alert(
       'Login Failed',
