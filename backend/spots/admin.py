@@ -1,3 +1,5 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Spot, SpotPhoto, OpeningHours, Review, Favorite, BusynessReport
+
+admin.site.register([Spot, SpotPhoto, OpeningHours, Review, Favorite, BusynessReport])

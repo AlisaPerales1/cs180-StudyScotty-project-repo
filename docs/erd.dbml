@@ -1,0 +1,222 @@
+// Source ERD supplied by the team. See database.md for implementation decisions.
+Table User {
+  id bigint [pk, increment]
+  username varchar(150) [not null, unique]
+  email varchar(254) [not null, note: 'Proposed required UCR email. Verification and email uniqueness/login policy are pending.']
+  password varchar(128) [not null, note: 'Django password hash; never plaintext.']
+  first_name varchar(150)
+  last_name varchar(150)
+  is_active boolean [not null, default: true]
+  is_staff boolean [not null, default: false]
+  is_superuser boolean [not null, default: false]
+  last_login timestamp
+  date_joined timestamp [not null]
+}
+
+Table UserProfile {
+  user_id bigint [pk]
+  profile_photo_key varchar(500) [note: 'Storage key; photo provider is pending.']
+  study_preferences text
+  email_verified_at timestamp [note: 'Null until ownership is verified; verification flow is pending.']
+  updated_at timestamp [not null]
+}
+
+Table Course {
+  id bigint [pk, increment]
+  code varchar(30) [not null, unique, note: 'Example: CS 010. Course catalog entries, not term-specific sections.']
+  name varchar(200) [not null]
+}
+
+Table UserCourse {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  course_id bigint [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (user_id, course_id) [unique]
+  }
+}
+
+Table Spot {
+  id bigint [pk, increment]
+  creator_id bigint [not null]
+  name varchar(200) [not null]
+  description text
+  location_details text
+  latitude decimal(9,6) [not null, note: 'Validate between -90 and 90.']
+  longitude decimal(9,6) [not null, note: 'Validate between -180 and 180.']
+  noise_level varchar(20) [note: 'Proposed: quiet, moderate, loud; null means unknown.']
+  has_outlets boolean [note: 'Null means unknown.']
+  has_wifi boolean [note: 'Null means unknown.']
+  is_indoor boolean [note: 'Null means unknown.']
+  is_group_friendly boolean [note: 'Null means unknown.']
+  hours_status varchar(30) [not null, default: 'unknown', note: 'Proposed: unknown, always_accessible, scheduled.']
+  timezone varchar(64) [not null, default: 'America/Los_Angeles']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table SpotPhoto {
+  id bigint [pk, increment]
+  spot_id bigint [not null]
+  uploader_id bigint [not null]
+  storage_key varchar(500) [not null, note: 'Store a file reference, not image bytes; provider pending.']
+  caption varchar(250)
+  created_at timestamp [not null]
+}
+
+Table OpeningHours {
+  id bigint [pk, increment]
+  spot_id bigint [not null]
+  weekday integer [not null, note: 'Proposed: 0=Monday through 6=Sunday, in the spot timezone.']
+  opens_at time [not null]
+  closes_at time [not null]
+  closes_next_day boolean [not null, default: false, note: 'Proposed explicit overnight interval representation.']
+
+  Note: 'Proposed weekly intervals for scheduled spots; multiple windows per day are allowed. No interval means closed that day only when hours_status is scheduled. Holiday exceptions are outside this draft.'
+}
+
+Table Review {
+  id bigint [pk, increment]
+  spot_id bigint [not null]
+  author_id bigint [not null]
+  rating integer [not null, note: 'Validate between 1 and 5.']
+  comment text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Whether to enforce one review per user per spot is pending; no unique pair is assumed.'
+}
+
+Table Favorite {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  spot_id bigint [not null]
+  opening_reminder_enabled boolean [not null, default: false]
+  created_at timestamp [not null]
+
+  indexes {
+    (user_id, spot_id) [unique]
+  }
+
+  Note: 'Reminder preference is proposed; notifications are scheduled locally on each device.'
+}
+
+Table BusynessReport {
+  id bigint [pk, increment]
+  spot_id bigint [not null]
+  reporter_id bigint [not null]
+  level varchar(20) [not null, note: 'empty, some_seats, packed. Unknown is derived when no fresh report exists.']
+  reported_at timestamp [not null]
+  expires_at timestamp [not null, note: 'Expiration duration is pending: proposal lists both one and two hours.']
+
+  indexes {
+    (spot_id, reported_at)
+  }
+
+  Note: 'Accept only after the shared proximity check succeeds. Raw reporter coordinates are not retained in this proposal.'
+}
+
+Table StudySession {
+  id bigint [pk, increment]
+  creator_id bigint [not null]
+  spot_id bigint [not null]
+  course_id bigint [not null]
+  starts_at timestamp [not null]
+  ends_at timestamp [not null, note: 'Must follow starts_at; maximum duration is two hours.']
+  capacity integer [not null, note: 'Must be positive. Decide whether the creator occupies an RSVP/capacity slot.']
+  status varchar(30) [not null, default: 'upcoming', note: 'Proposed: upcoming, in_progress, completed, cancelled, no_show. Transition rules pending.']
+  cancellation_reason varchar(50) [note: 'Proposed examples: spot_full, creator_cancelled. No-show classification pending.']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    (spot_id, starts_at)
+    (course_id, starts_at)
+    (creator_id, status)
+  }
+
+  Note: 'A meetup, not a reservation. Single-active/upcoming-session limit scope is pending. Check-in window: 10 minutes before through 15 minutes after start, per proposal. Expiration/no-show transitions require backend processing, not just fields.'
+}
+
+Table RSVP {
+  id bigint [pk, increment]
+  session_id bigint [not null]
+  user_id bigint [not null]
+  status varchar(20) [not null, default: 'going', note: 'Proposed: going, cancelled; cancellation/rejoin behavior pending.']
+  reminder_enabled boolean [not null, default: false]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    (session_id, user_id) [unique]
+  }
+
+  Note: 'Capacity must be enforced atomically. Course membership and session eligibility are backend rules. Reminder scheduling is local to each device.'
+}
+
+Table SessionCheckIn {
+  id bigint [pk, increment]
+  session_id bigint [not null]
+  user_id bigint [not null]
+  outcome varchar(20) [not null, note: 'Proposed: space_available, spot_full.']
+  busyness_report_id bigint [note: 'Optional report produced by the same action; must match the session spot and reporting user.']
+  checked_in_at timestamp [not null]
+
+  Note: 'Proposed audit of creator/RSVP-member proximity-verified actions. Must pass shared proximity and applicable time-window checks. Duplicate handling and transition permissions are pending.'
+}
+
+Table AbuseReport {
+  id bigint [pk, increment]
+  session_id bigint [not null]
+  reporter_id bigint [not null]
+  reason varchar(100) [not null]
+  details text
+  status varchar(20) [not null, default: 'pending', note: 'Proposed: pending, reviewed, dismissed.']
+  reviewed_by_id bigint
+  reviewed_at timestamp
+  created_at timestamp [not null]
+
+  Note: 'Abuse/moderation reports are separate from busyness reports. Duplicate-report and retention policies are pending.'
+}
+
+Table SessionCreationRestriction {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  reason text [not null]
+  starts_at timestamp [not null]
+  ends_at timestamp [not null]
+  lifted_by_id bigint
+  lifted_at timestamp
+  created_at timestamp [not null]
+
+  Note: 'Proposed timed creation block with admin override. Automatic thresholds and block duration are pending; do not equate raw report count with confirmed abuse without an agreed policy.'
+}
+
+ref: User.id - UserProfile.user_id
+ref: UserCourse.user_id > User.id
+ref: UserCourse.course_id > Course.id
+ref: Spot.creator_id > User.id
+ref: SpotPhoto.spot_id > Spot.id
+ref: SpotPhoto.uploader_id > User.id
+ref: OpeningHours.spot_id > Spot.id
+ref: Review.spot_id > Spot.id
+ref: Review.author_id > User.id
+ref: Favorite.user_id > User.id
+ref: Favorite.spot_id > Spot.id
+ref: BusynessReport.spot_id > Spot.id
+ref: BusynessReport.reporter_id > User.id
+ref: StudySession.creator_id > User.id
+ref: StudySession.spot_id > Spot.id
+ref: StudySession.course_id > Course.id
+ref: RSVP.session_id > StudySession.id
+ref: RSVP.user_id > User.id
+ref: SessionCheckIn.session_id > StudySession.id
+ref: SessionCheckIn.user_id > User.id
+ref: SessionCheckIn.busyness_report_id > BusynessReport.id
+ref: AbuseReport.session_id > StudySession.id
+ref: AbuseReport.reporter_id > User.id
+ref: AbuseReport.reviewed_by_id > User.id
+ref: SessionCreationRestriction.user_id > User.id
+ref: SessionCreationRestriction.lifted_by_id > User.id

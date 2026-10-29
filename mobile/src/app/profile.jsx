@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { BIO_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { NAME_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
+import ActionButton from '../components/ActionButton';
 import ConnectionStatus from '../components/ConnectionStatus';
 import Screen from '../components/Screen';
-
-const NAME_MAX_LENGTH = 150;
 
 /** @param {import('../api/profile').Profile} profile */
 function toDraft(profile) {
   return {
     first_name: profile.first_name,
     last_name: profile.last_name,
-    major: profile.major,
-    graduation_year: profile.graduation_year == null ? '' : String(profile.graduation_year),
-    bio: profile.bio,
+    study_preferences: profile.study_preferences,
   };
 }
 
@@ -24,26 +21,15 @@ function validate(draft) {
   if (!draft.first_name.trim()) errors.first_name = 'First name is required.';
   else if (draft.first_name.trim().length > NAME_MAX_LENGTH) errors.first_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
   if (draft.last_name.trim().length > NAME_MAX_LENGTH) errors.last_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
-  const year = draft.graduation_year.trim();
-  if (year) {
-    const thisYear = new Date().getFullYear();
-    if (!/^\d{4}$/.test(year) || Number(year) < thisYear - 1 || Number(year) > thisYear + 8) {
-      errors.graduation_year = `Enter a year between ${thisYear - 1} and ${thisYear + 8}.`;
-    }
-  }
-  if (draft.bio.length > BIO_MAX_LENGTH) errors.bio = `Use ${BIO_MAX_LENGTH} characters or fewer.`;
   return errors;
 }
 
 /** @param {ReturnType<typeof toDraft>} draft */
 function toChanges(draft) {
-  const year = draft.graduation_year.trim();
   return {
     first_name: draft.first_name.trim(),
     last_name: draft.last_name.trim(),
-    major: draft.major.trim(),
-    graduation_year: year ? Number(year) : null,
-    bio: draft.bio.trim(),
+    study_preferences: draft.study_preferences.trim(),
   };
 }
 
@@ -122,12 +108,9 @@ export default function ProfileScreen() {
             onChangeText={(value) => setField('first_name', value)} autoComplete="given-name" />
           <Field label="Last name" value={draft.last_name} error={errors.last_name}
             onChangeText={(value) => setField('last_name', value)} autoComplete="family-name" />
-          <Field label="Major" value={draft.major} error={errors.major}
-            onChangeText={(value) => setField('major', value)} />
-          <Field label="Graduation year" value={draft.graduation_year} error={errors.graduation_year}
-            onChangeText={(value) => setField('graduation_year', value)} keyboardType="number-pad" maxLength={4} />
-          <Field label={`Bio (${draft.bio.length}/${BIO_MAX_LENGTH})`} value={draft.bio} error={errors.bio}
-            onChangeText={(value) => setField('bio', value)} multiline />
+          <Field label="Study preferences" value={draft.study_preferences} error={errors.study_preferences}
+            onChangeText={(value) => setField('study_preferences', value)} multiline
+            placeholder="e.g. Quiet spots with outlets, mornings, group sessions for CS courses" />
           <View style={styles.actions}>
             <ActionButton title="Cancel" variant="secondary" onPress={cancelEditing} disabled={saving} />
             <ActionButton title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
@@ -137,9 +120,7 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ')}</Text>
           <Text style={styles.muted}>@{profile.username} · {profile.email}</Text>
-          <Detail label="Major" value={profile.major} />
-          <Detail label="Graduation year" value={profile.graduation_year == null ? '' : String(profile.graduation_year)} />
-          <Detail label="Bio" value={profile.bio} />
+          <Detail label="Study preferences" value={profile.study_preferences} />
           <ActionButton title="Edit profile" onPress={startEditing} />
         </View>
       )}
@@ -176,26 +157,6 @@ function Field({ label, error, multiline, ...inputProps }) {
   );
 }
 
-/** @param {{ title: string, onPress: () => void, disabled?: boolean, variant?: 'primary' | 'secondary' }} props */
-function ActionButton({ title, onPress, disabled, variant = 'primary' }) {
-  const secondary = variant === 'secondary';
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.button,
-        secondary && styles.buttonSecondary,
-        (pressed || disabled) && { opacity: 0.6 },
-      ]}
-    >
-      <Text style={[styles.buttonText, secondary && styles.buttonTextSecondary]}>{title}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   card: { padding: 20, gap: 14, backgroundColor: 'white', borderRadius: 16 },
   name: { fontSize: 22, fontWeight: '700', color: '#142d4e' },
@@ -211,9 +172,5 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#c0392b' },
   error: { color: '#c0392b', fontSize: 13 },
   actions: { flexDirection: 'row', gap: 12, justifyContent: 'flex-end' },
-  button: { backgroundColor: '#2463a0', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20, alignItems: 'center' },
-  buttonSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#2463a0' },
-  buttonText: { color: 'white', fontWeight: '600', fontSize: 16 },
-  buttonTextSecondary: { color: '#2463a0' },
   message: { color: '#2463a0' },
 });

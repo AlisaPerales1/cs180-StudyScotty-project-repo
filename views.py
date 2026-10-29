@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # spots/views.py  (Week 4: filters + detail + urls in one file)
 #
 # Project urls.py needs ONE line:
@@ -10,6 +11,8 @@
 #   GET /api/spots/<id>/                   -> one spot
 
 from django.urls import path
+=======
+>>>>>>> b96f7a81c6f6652fbdd3c0752ee33571b6cd0f79
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 
@@ -17,6 +20,7 @@ from .models import Spot
 from .serializers import SpotSerializer
 
 
+<<<<<<< HEAD
 def parse_bool(value):
     return str(value).lower() in ("1", "true", "yes")
 
@@ -53,3 +57,11 @@ urlpatterns = [
     path("spots/", SpotListView.as_view(), name="spot-list"),
     path("spots/<int:pk>/", SpotDetailView.as_view(), name="spot-detail"),
 ]
+=======
+class SpotListView(generics.ListAPIView):
+    """GET /api/spots/  (public read-only for now so the map isn't blocked by auth)"""
+    queryset = Spot.objects.all().order_by("name")
+    serializer_class = SpotSerializer
+    permission_classes = [AllowAny]
+    pagination_class = None  # return a plain array
+>>>>>>> b96f7a81c6f6652fbdd3c0752ee33571b6cd0f79
