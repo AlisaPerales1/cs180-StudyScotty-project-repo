@@ -9,29 +9,50 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { login } from '../api/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Error', 'Please fill in all fields.');
-      return;
+  const handleLogin = async () => {
+  if (!email.trim() || !password) {
+    Alert.alert('Error', 'Please fill in all fields.');
+    return;
+  }
+
+  if (!email.trim().toLowerCase().endsWith('@ucr.edu')) {
+    Alert.alert('Invalid Email', 'Please use your UCR email.');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await login(email, password);
+
+    if (!response.access || !response.refresh) {
+      throw new Error('The server did not return authentication tokens.');
     }
 
-    if (!email.trim().toLowerCase().endsWith('@ucr.edu')) {
-      Alert.alert('Invalid Email', 'Please use your UCR email.');
-      return;
-    }
+    // Temporary development test.
+    // We'll add secure token storage and authenticated navigation next.
+    console.log('Login successful for:', response.user?.username);
 
+    // Navigate to the Discover screen after successful login
+    router.replace('/discover');
+  } catch (error) {
     Alert.alert(
-      'Login',
-      'Login form validated. Backend authentication is not connected yet.'
+      'Login Failed',
+      error.message || 'Unable to connect to the server.'
     );
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -58,9 +79,12 @@ export default function LoginScreen() {
       <TouchableOpacity
         style={styles.button}
         onPress={handleLogin}
+        disabled={loading}
       >
-        <Text style={styles.buttonText}>Log In</Text>
-      </TouchableOpacity>
+      <Text style={styles.buttonText}>
+        {loading ? 'Logging In...' : 'Log In'}
+      </Text>
+</TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push('/signup')}>
         <Text style={styles.link}>

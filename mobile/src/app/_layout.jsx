@@ -7,15 +7,18 @@ export default function RootLayout() {
     <>
       <StatusBar style="dark" />
 
+      
+
       <Tabs
+        initialRouteName="login"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: '#2463a0',
         }}
       >
         <Tabs.Screen
-          name="index"
-          options={{ title: 'Discover' }}
+        name="discovery"
+        options={{ title: 'Discovery' }}
         />
 
         <Tabs.Screen
