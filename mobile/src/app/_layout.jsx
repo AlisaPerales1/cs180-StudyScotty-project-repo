@@ -17,8 +17,8 @@ export default function RootLayout() {
         }}
       >
         <Tabs.Screen
-        name="discover"
-        options={{ title: 'Discover' }}
+        name="discovery"
+        options={{ title: 'Discovery' }}
         />
 
         <Tabs.Screen
