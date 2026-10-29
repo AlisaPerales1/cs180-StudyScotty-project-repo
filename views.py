@@ -52,4 +52,4 @@ class SpotDetailView(generics.RetrieveAPIView):
 urlpatterns = [
     path("spots/", SpotListView.as_view(), name="spot-list"),
     path("spots/<int:pk>/", SpotDetailView.as_view(), name="spot-detail"),
-]
+]g
