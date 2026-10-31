@@ -1,2 +1,5 @@
-# Add feature routes after agreeing on the API contract.
-urlpatterns = []
+from django.urls import path
+
+from .views import CurrentProfileView
+
+urlpatterns = [path("me/", CurrentProfileView.as_view(), name="current-profile")]
