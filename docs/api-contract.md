@@ -38,16 +38,17 @@ Resolve and document UCR email ownership verification, unknown versus always-acc
 
 ## Account field alignment
 
-The authentication integration uses email/password login with JWT bearer tokens.
-Signup accepts `username`, `email`, and `password`. The frontend's username is
-stored as `User.username`; it is a display name, while email is used for login.
+The separate authentication branch targets email/password login with JWT bearer
+tokens and signup with `username`, `email`, and `password`. That implementation
+is not included in this profile branch. Its username is a display name and
+email is its login identifier; this profile feature does not change that design.
 First and last names are optional profile fields, each up to 150 characters;
 signup does not need to collect them. There is no `full_name` field.
 
 Profile description text means `study_preferences`; there is no separate bio
 field. Email changes, UCR ownership verification, and photo uploads remain
 pending. Domain validation is not ownership verification. No OAuth provider is
-implemented in the teammate's current authentication branch.
+implemented by this profile feature.
 
 ## Current user profile
 
@@ -90,7 +91,7 @@ so for this endpoint to work.
 
 | Field | Update rules |
 | --- | --- |
-| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). Changing it changes the display name; email login, user ID, and ownership stay the same. |
+| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). User ID and ownership stay the same. The separate email-login implementation uses email rather than username; under the current development basic authentication, credentials still use the updated username. |
 | `first_name`, `last_name` | Strings up to 150 characters; empty strings allowed. |
 | `study_preferences` | String; empty string allowed; description text for the current frontend. |
 | `email` | Read-only; including it in PATCH returns 400, even if unchanged. |
@@ -116,8 +117,8 @@ Validation failures use field names mapped to arrays of messages, for example:
 | 415 | Unsupported request content type. Send JSON for PATCH. |
 
 Current authentication is inherited from DRF defaults (session and basic).
-Session-authenticated PATCH requests require CSRF. The authentication teammate
-should configure the agreed mobile authenticator globally; this view uses
+Session-authenticated PATCH requests require CSRF. The separate authentication feature
+will configure its mobile authenticator globally when integrated; this view uses
 `request.user` and needs no user identifier from the client. Login/signup and
 UCR verification remain outside this profile implementation.
 
