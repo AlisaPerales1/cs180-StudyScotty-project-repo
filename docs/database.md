@@ -13,9 +13,14 @@ The backend implements the 15 domain tables in the supplied [ERD](erd.dbml). Dja
 
 All relationships to users use `settings.AUTH_USER_MODEL`. Django's built-in auth, group, permission, admin, and login-session tables also exist. They are omitted from the ERD.
 
-`User` retains `AbstractUser` and username/password login. Email is now required by model/admin validation, without introducing email uniqueness or enforcing a UCR domain. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile.
+`User` retains `AbstractUser` and username/password login. Email is now required by model/admin validation, without introducing email uniqueness or enforcing a UCR domain. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile. The profile API reads a missing profile as empty study preferences and creates the row on a valid preferences update. Profile updates do not change the schema.
 
 Optional text uses empty strings following Django conventions, including inherited first/last names, descriptions, storage keys, comments, and cancellation reasons. Unknown noise and amenity values remain SQL NULL, as in the ERD. Photos are storage references; no upload provider is configured.
+
+`UserProfile.study_preferences` also stores the profile bio/description used
+by the frontend. It is optional plain text stored as an empty string when
+cleared; there are no separate bio/description columns or new migrations.
+Profile GET/PATCH uses the existing field, preserving the agreed schema.
 
 ## Database connection and setup
 

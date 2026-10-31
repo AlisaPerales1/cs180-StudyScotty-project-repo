@@ -1,14 +1,15 @@
 /**
  * Profile data access.
  *
- * Temporary in-memory mock until the accounts profile endpoint and mobile
- * authentication are agreed in docs/api-contract.md. Screens should only use
+ * Temporary in-memory mock while mobile authentication is being implemented.
+ * The backend GET/PATCH accounts/me/ contract is in docs/api-contract.md. Screens should only use
  * getProfile/updateProfile so the real API can replace this file's internals.
  * Edits persist while the app is running and reset on reload.
  *
  * Fields mirror the database (docs/database.md): username, email, first_name,
  * and last_name come from accounts.User; study_preferences comes from
- * accounts.UserProfile.
+ * accounts.UserProfile. study_preferences is also the profile bio/description;
+ * do not send separate bio or description keys to the backend.
  */
 
 /**
@@ -22,10 +23,10 @@
  */
 
 /**
- * Fields the user may change. Username and email are read-only until login
- * and UCR email verification are agreed.
+ * Fields the user may change. Email stays read-only pending UCR verification.
+ * Username is a display name; sign-in uses email.
  */
-export const EDITABLE_FIELDS = ['first_name', 'last_name', 'study_preferences'];
+export const EDITABLE_FIELDS = ['username', 'first_name', 'last_name', 'study_preferences'];
 
 /** Matches Django's AbstractUser first_name/last_name max_length. */
 export const NAME_MAX_LENGTH = 150;
