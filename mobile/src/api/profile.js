@@ -23,7 +23,7 @@
 
 /**
  * Fields the user may change. Email stays read-only pending UCR verification.
- * Username changes also change the username used to sign in.
+ * Username is a display name; sign-in uses email.
  */
 export const EDITABLE_FIELDS = ['username', 'first_name', 'last_name', 'study_preferences'];
 

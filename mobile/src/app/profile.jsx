@@ -109,7 +109,7 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Field label="Username" value={draft.username} error={errors.username}
             onChangeText={(value) => setField('username', value)} autoCapitalize="none" />
-          <Text style={styles.muted}>Your username is also used to sign in.</Text>
+          <Text style={styles.muted}>Your username is your display name. Sign in with your email.</Text>
           <Field label="First name" value={draft.first_name} error={errors.first_name}
             onChangeText={(value) => setField('first_name', value)} autoComplete="given-name" />
           <Field label="Last name" value={draft.last_name} error={errors.last_name}

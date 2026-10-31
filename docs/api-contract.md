@@ -38,21 +38,16 @@ Resolve and document UCR email ownership verification, unknown versus always-acc
 
 ## Account field alignment
 
-The mobile forms follow the existing `accounts.User` model: username is the
-login identifier, and signup collects `username`, `email`, `first_name`,
-`last_name`, and `password`. Names are separate optional strings (up to 150
-characters each); there is no `full_name` field. Username is required, unique,
-and at most 150 characters, using Django's Unicode username validator.
-Password confirmation is a frontend check, not an account field.
+The authentication integration uses email/password login with JWT bearer tokens.
+Signup accepts `username`, `email`, and `password`. The frontend's username is
+stored as `User.username`; it is a display name, while email is used for login.
+First and last names are optional profile fields, each up to 150 characters;
+signup does not need to collect them. There is no `full_name` field.
 
-Login/signup routes and the mobile credential transport remain owned by the
-authentication feature; the forms currently validate locally without sending
-requests. Email login would require a separate agreement on email uniqueness
-and migration behavior. The frontend UCR-domain check does not verify ownership.
-
-Profile description text currently means `study_preferences`; there is no
-separate bio field. Email ownership verification, email changes, and photo
-uploads remain pending. Existing blank first/last names are valid.
+Profile description text means `study_preferences`; there is no separate bio
+field. Email changes, UCR ownership verification, and photo uploads remain
+pending. Domain validation is not ownership verification. No OAuth provider is
+implemented in the teammate's current authentication branch.
 
 ## Current user profile
 
@@ -95,7 +90,7 @@ so for this endpoint to work.
 
 | Field | Update rules |
 | --- | --- |
-| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). Changing it changes the username used for login; user ID and ownership stay the same. |
+| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). Changing it changes the display name; email login, user ID, and ownership stay the same. |
 | `first_name`, `last_name` | Strings up to 150 characters; empty strings allowed. |
 | `study_preferences` | String; empty string allowed; description text for the current frontend. |
 | `email` | Read-only; including it in PATCH returns 400, even if unchanged. |

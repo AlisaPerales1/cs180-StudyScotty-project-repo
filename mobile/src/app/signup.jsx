@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import {
+  View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -13,26 +14,19 @@ import { useRouter } from 'expo-router';
 export default function SignupScreen() {
   const router = useRouter();
 
-  const [username, setUsername] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSignup = () => {
     if (
-      !username.trim() ||
+      !name.trim() ||
       !email.trim() ||
       !password ||
       !confirmPassword
     ) {
       Alert.alert('Error', 'Please fill in all fields.');
-      return;
-    }
-
-    if (username.trim().length > 150 || firstName.trim().length > 150 || lastName.trim().length > 150) {
-      Alert.alert('Invalid account details', 'Username and names must be 150 characters or fewer.');
       return;
     }
 
@@ -84,26 +78,10 @@ export default function SignupScreen() {
 
       <TextInput
         style={styles.input}
-        placeholder="Username"
-        autoCapitalize="none"
-        value={username}
-        onChangeText={setUsername}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="First name (optional)"
+        placeholder="Full Name"
         autoCapitalize="words"
-        value={firstName}
-        onChangeText={setFirstName}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Last name (optional)"
-        autoCapitalize="words"
-        value={lastName}
-        onChangeText={setLastName}
+        value={name}
+        onChangeText={setName}
       />
 
       <TextInput
