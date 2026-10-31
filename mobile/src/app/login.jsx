@@ -13,17 +13,12 @@ import { useRouter } from 'expo-router';
 export default function LoginScreen() {
   const router = useRouter();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = () => {
-    if (!email.trim() || !password) {
+    if (!username.trim() || !password) {
       Alert.alert('Error', 'Please fill in all fields.');
-      return;
-    }
-
-    if (!email.trim().toLowerCase().endsWith('@ucr.edu')) {
-      Alert.alert('Invalid Email', 'Please use your UCR email.');
       return;
     }
 
@@ -40,11 +35,10 @@ export default function LoginScreen() {
 
       <TextInput
         style={styles.input}
-        placeholder="UCR Email"
+        placeholder="Username"
         autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
+        value={username}
+        onChangeText={setUsername}
       />
 
       <TextInput
@@ -64,7 +58,7 @@ export default function LoginScreen() {
 
       <TouchableOpacity onPress={() => router.push('/signup')}>
         <Text style={styles.link}>
-          Don't have an account? Sign Up
+          Don&apos;t have an account? Sign Up
         </Text>
       </TouchableOpacity>
     </View>

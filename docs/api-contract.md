@@ -35,3 +35,21 @@ These URL includes are scaffolded but contain no endpoints yet; requests to them
 For each endpoint, document the method/path, request and response examples, status codes, field validation, permissions, and side effects. Define authentication and error formatting. DRF's configured default pagination uses `count`, `next`, `previous`, and `results`, with a page size of 20; list views must opt into the appropriate generic views or pagination helper.
 
 Resolve and document UCR email ownership verification, unknown versus always-accessible hours, busyness expiration (one versus two hours), session limit scope, session lifecycle/check-in windows, and atomic RSVP capacity enforcement and duplicate behavior. Feature endpoints and payloads are deliberately pending these decisions.
+
+## Account field alignment
+
+The mobile forms follow the existing `accounts.User` model: username is the
+login identifier, and signup collects `username`, `email`, `first_name`,
+`last_name`, and `password`. Names are separate optional strings (up to 150
+characters each); there is no `full_name` field. Username is required, unique,
+and at most 150 characters, using Django's Unicode username validator.
+Password confirmation is a frontend check, not an account field.
+
+Login/signup routes and the mobile credential transport remain owned by the
+authentication feature; the forms currently validate locally without sending
+requests. Email login would require a separate agreement on email uniqueness
+and migration behavior. The frontend UCR-domain check does not verify ownership.
+
+Profile description text currently means `study_preferences`; there is no
+separate bio field. Email ownership verification, email changes, and photo
+uploads remain pending. Existing blank first/last names are valid.

@@ -18,8 +18,7 @@ function toDraft(profile) {
 function validate(draft) {
   /** @type {Record<string, string>} */
   const errors = {};
-  if (!draft.first_name.trim()) errors.first_name = 'First name is required.';
-  else if (draft.first_name.trim().length > NAME_MAX_LENGTH) errors.first_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
+  if (draft.first_name.trim().length > NAME_MAX_LENGTH) errors.first_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
   if (draft.last_name.trim().length > NAME_MAX_LENGTH) errors.last_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
   return errors;
 }
@@ -118,7 +117,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <View style={styles.card}>
-          <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ')}</Text>
+          <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.username}</Text>
           <Text style={styles.muted}>@{profile.username} · {profile.email}</Text>
           <Detail label="Study preferences" value={profile.study_preferences} />
           <ActionButton title="Edit profile" onPress={startEditing} />
