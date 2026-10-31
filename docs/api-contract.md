@@ -93,7 +93,7 @@ so for this endpoint to work.
 | --- | --- |
 | `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). User ID and ownership stay the same. The separate email-login implementation uses email rather than username; under the current development basic authentication, credentials still use the updated username. |
 | `first_name`, `last_name` | Strings up to 150 characters; empty strings allowed. |
-| `study_preferences` | Profile bio/description shown as "Bio / study preferences" in the frontend. String; no API length limit; empty string allowed. |
+| `study_preferences` | Profile bio/description shown as "Study preferences" in the frontend. String; no API length limit; empty string allowed. |
 | `email` | Read-only; including it in PATCH returns 400, even if unchanged. |
 
 Text is trimmed. Nulls and non-string field values are rejected. Unknown fields
@@ -147,7 +147,7 @@ objects return 400 with `study_preferences` field errors. The keys `bio` and
 `description` are not aliases and return 400, avoiding duplicate sources of
 truth. Existing authentication and ownership rules apply.
 
-The frontend's existing multiline field is labeled "Bio / study preferences"
+The frontend's existing multiline field is labeled "Study preferences"
 and continues to use the same `study_preferences` key in `getProfile()` and
 `updateProfile()`. It still uses the in-memory adapter until mobile credentials
 and real profile requests are integrated; saving in the app currently does not
