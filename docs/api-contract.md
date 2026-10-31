@@ -45,8 +45,8 @@ email is its login identifier; this profile feature does not change that design.
 First and last names are optional profile fields, each up to 150 characters;
 signup does not need to collect them. There is no `full_name` field.
 
-Profile description text means `study_preferences`; there is no separate bio
-field. Email changes, UCR ownership verification, and photo uploads remain
+The existing `study_preferences` field is the profile bio/description, matching
+the frontend input. There are no separate `bio` or `description` fields. Email changes, UCR ownership verification, and photo uploads remain
 pending. Domain validation is not ownership verification. No OAuth provider is
 implemented by this profile feature.
 
@@ -93,11 +93,11 @@ so for this endpoint to work.
 | --- | --- |
 | `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). User ID and ownership stay the same. The separate email-login implementation uses email rather than username; under the current development basic authentication, credentials still use the updated username. |
 | `first_name`, `last_name` | Strings up to 150 characters; empty strings allowed. |
-| `study_preferences` | String; empty string allowed; description text for the current frontend. |
+| `study_preferences` | Profile bio/description shown as "Bio / study preferences" in the frontend. String; no API length limit; empty string allowed. |
 | `email` | Read-only; including it in PATCH returns 400, even if unchanged. |
 
 Text is trimmed. Nulls and non-string field values are rejected. Unknown fields
-(including `description`, `id`, `user`, `password`, and privilege or verification
+(including `bio`, `description`, `id`, `user`, `password`, and privilege or verification
 fields) return 400. Validation failures leave all fields unchanged. Existing
 blank names and unverified accounts can use this endpoint; it does not claim
 UCR ownership has been verified.
@@ -127,3 +127,28 @@ credential flow is ready. Replace `getProfile`/`updateProfile` internals with
 GET/PATCH calls to this route using those credentials; do not send the full
 GET object back as PATCH because email is read-only. Frontend validation is
 for feedback; API validation is authoritative.
+
+### Read and edit the profile bio/description
+
+Use the existing profile route; no separate bio or description URL is needed.
+`GET /accounts/me/` returns the saved bio in `study_preferences`. To update only
+that text, send `PATCH /accounts/me/` with:
+
+```json
+{"study_preferences": "CS student at UCR. I prefer quiet spaces and small study groups."}
+```
+
+HTTP 200 returns the full profile, including the saved `study_preferences`.
+Names, username, and email stay unchanged. A missing `UserProfile` row is created
+when this valid update is saved. An empty string clears the bio; omitting the
+field leaves it unchanged. Leading/trailing whitespace is trimmed; internal
+newlines and Unicode text are preserved. Nulls, numbers, booleans, arrays, and
+objects return 400 with `study_preferences` field errors. The keys `bio` and
+`description` are not aliases and return 400, avoiding duplicate sources of
+truth. Existing authentication and ownership rules apply.
+
+The frontend's existing multiline field is labeled "Bio / study preferences"
+and continues to use the same `study_preferences` key in `getProfile()` and
+`updateProfile()`. It still uses the in-memory adapter until mobile credentials
+and real profile requests are integrated; saving in the app currently does not
+exercise these backend endpoints.

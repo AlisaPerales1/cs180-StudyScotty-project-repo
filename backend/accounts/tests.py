@@ -171,3 +171,52 @@ class ProfileEndpointTests(TestCase):
         self.assertEqual(client.patch(self.url, {"first_name": "Changed"}, format="json").status_code, 403)
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, "Scotty")
+
+    def test_bio_uses_study_preferences_and_preserves_other_profile_data(self):
+        from django.utils import timezone
+
+        verified_at = timezone.now()
+        UserProfile.objects.create(
+            user=self.user, study_preferences="Old bio", profile_photo_key="photos/one.jpg",
+            email_verified_at=verified_at,
+        )
+        bio = "CS student at UCR.\nI prefer quiet spaces and small study groups. 📚"
+        response = self.client.patch(self.url, {"study_preferences": f"  {bio}  "}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "username": "scotty", "email": "scotty@ucr.edu",
+            "first_name": "Scotty", "last_name": "Highlander", "study_preferences": bio,
+        })
+        profile = UserProfile.objects.get(user=self.user)
+        self.assertEqual(profile.study_preferences, bio)
+        self.assertEqual(profile.profile_photo_key, "photos/one.jpg")
+        self.assertEqual(profile.email_verified_at, verified_at)
+        self.assertEqual(self.client.get(self.url).json(), response.json())
+        self.assertFalse(UserProfile.objects.filter(user=self.other).exists())
+
+    def test_bio_can_be_cleared_and_omitted_without_changes(self):
+        UserProfile.objects.create(user=self.user, study_preferences="Existing bio")
+        response = self.client.patch(self.url, {"first_name": "New name"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["study_preferences"], "Existing bio")
+        response = self.client.patch(self.url, {"study_preferences": "   "}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["study_preferences"], "")
+        self.assertEqual(UserProfile.objects.get(user=self.user).study_preferences, "")
+        self.assertEqual(self.client.get(self.url).json()["first_name"], "New name")
+
+    def test_bio_requires_string_and_alias_keys_are_rejected(self):
+        for changes, field in [
+            ({"study_preferences": None}, "study_preferences"),
+            ({"study_preferences": 123}, "study_preferences"),
+            ({"study_preferences": True}, "study_preferences"),
+            ({"study_preferences": []}, "study_preferences"),
+            ({"study_preferences": {}}, "study_preferences"),
+            ({"bio": "Text"}, "bio"),
+            ({"description": "Text"}, "description"),
+        ]:
+            with self.subTest(field=field, changes=changes):
+                response = self.client.patch(self.url, changes, format="json")
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.json())
+                self.assertFalse(UserProfile.objects.filter(user=self.user).exists())

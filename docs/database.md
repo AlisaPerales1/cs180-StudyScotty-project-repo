@@ -17,6 +17,11 @@ All relationships to users use `settings.AUTH_USER_MODEL`. Django's built-in aut
 
 Optional text uses empty strings following Django conventions, including inherited first/last names, descriptions, storage keys, comments, and cancellation reasons. Unknown noise and amenity values remain SQL NULL, as in the ERD. Photos are storage references; no upload provider is configured.
 
+`UserProfile.study_preferences` also stores the profile bio/description used
+by the frontend. It is optional plain text stored as an empty string when
+cleared; there are no separate bio/description columns or new migrations.
+Profile GET/PATCH uses the existing field, preserving the agreed schema.
+
 ## Database connection and setup
 
 The connection is configured by `config/database.py`, used by `config/settings.py`, and reads `DATABASE_URL` from the environment or `backend/.env`. Blank/unset URLs select `backend/db.sqlite3`. Local environment files and the SQLite database are ignored by Git.

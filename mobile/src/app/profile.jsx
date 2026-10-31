@@ -114,9 +114,9 @@ export default function ProfileScreen() {
             onChangeText={(value) => setField('first_name', value)} autoComplete="given-name" />
           <Field label="Last name" value={draft.last_name} error={errors.last_name}
             onChangeText={(value) => setField('last_name', value)} autoComplete="family-name" />
-          <Field label="Study preferences" value={draft.study_preferences} error={errors.study_preferences}
+          <Field label="Bio / study preferences" value={draft.study_preferences} error={errors.study_preferences}
             onChangeText={(value) => setField('study_preferences', value)} multiline
-            placeholder="e.g. Quiet spots with outlets, mornings, group sessions for CS courses" />
+            placeholder="Tell others about yourself and how you like to study" />
           <View style={styles.actions}>
             <ActionButton title="Cancel" variant="secondary" onPress={cancelEditing} disabled={saving} />
             <ActionButton title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.username}</Text>
           <Text style={styles.muted}>@{profile.username} · {profile.email}</Text>
-          <Detail label="Study preferences" value={profile.study_preferences} />
+          <Detail label="Bio / study preferences" value={profile.study_preferences} />
           <ActionButton title="Edit profile" onPress={startEditing} />
         </View>
       )}

@@ -8,7 +8,8 @@
  *
  * Fields mirror the database (docs/database.md): username, email, first_name,
  * and last_name come from accounts.User; study_preferences comes from
- * accounts.UserProfile.
+ * accounts.UserProfile. study_preferences is also the profile bio/description;
+ * do not send separate bio or description keys to the backend.
  */
 
 /**

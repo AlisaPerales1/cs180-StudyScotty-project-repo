@@ -7,6 +7,8 @@ from .models import UserProfile
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    """Expose profile fields; study_preferences is the frontend bio/description."""
+
     study_preferences = serializers.CharField(
         source="profile.study_preferences", allow_blank=True, required=False, default="",
     )
