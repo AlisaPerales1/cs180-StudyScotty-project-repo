@@ -1,6 +1,9 @@
 
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { configureNotifications } from '../lib/reminders';
+
+configureNotifications();
 
 export default function RootLayout() {
   return (
@@ -42,6 +45,11 @@ export default function RootLayout() {
             href: null,
             tabBarStyle: { display: 'none' },
           }}
+        />
+
+        <Tabs.Screen
+          name="spots/[id]/index"
+          options={{ href: null }}
         />
 
         <Tabs.Screen

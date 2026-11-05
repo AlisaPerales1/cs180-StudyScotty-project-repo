@@ -8,6 +8,7 @@ import Screen from '../components/Screen';
 /** @param {import('../api/profile').Profile} profile */
 function toDraft(profile) {
   return {
+    username: profile.username,
     first_name: profile.first_name,
     last_name: profile.last_name,
     study_preferences: profile.study_preferences,
@@ -18,8 +19,9 @@ function toDraft(profile) {
 function validate(draft) {
   /** @type {Record<string, string>} */
   const errors = {};
-  if (!draft.first_name.trim()) errors.first_name = 'First name is required.';
-  else if (draft.first_name.trim().length > NAME_MAX_LENGTH) errors.first_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
+  if (!draft.username.trim()) errors.username = 'Username is required.';
+  else if (draft.username.trim().length > NAME_MAX_LENGTH) errors.username = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
+  if (draft.first_name.trim().length > NAME_MAX_LENGTH) errors.first_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
   if (draft.last_name.trim().length > NAME_MAX_LENGTH) errors.last_name = `Use ${NAME_MAX_LENGTH} characters or fewer.`;
   return errors;
 }
@@ -27,6 +29,7 @@ function validate(draft) {
 /** @param {ReturnType<typeof toDraft>} draft */
 function toChanges(draft) {
   return {
+    username: draft.username.trim(),
     first_name: draft.first_name.trim(),
     last_name: draft.last_name.trim(),
     study_preferences: draft.study_preferences.trim(),
@@ -104,13 +107,16 @@ export default function ProfileScreen() {
         <ActivityIndicator accessibilityLabel="Loading profile" />
       ) : editing ? (
         <View style={styles.card}>
+          <Field label="Username" value={draft.username} error={errors.username}
+            onChangeText={(value) => setField('username', value)} autoCapitalize="none" />
+          <Text style={styles.muted}>Your username is your display name. Sign in with your email.</Text>
           <Field label="First name" value={draft.first_name} error={errors.first_name}
             onChangeText={(value) => setField('first_name', value)} autoComplete="given-name" />
           <Field label="Last name" value={draft.last_name} error={errors.last_name}
             onChangeText={(value) => setField('last_name', value)} autoComplete="family-name" />
           <Field label="Study preferences" value={draft.study_preferences} error={errors.study_preferences}
             onChangeText={(value) => setField('study_preferences', value)} multiline
-            placeholder="e.g. Quiet spots with outlets, mornings, group sessions for CS courses" />
+            placeholder="Tell others about yourself and how you like to study" />
           <View style={styles.actions}>
             <ActionButton title="Cancel" variant="secondary" onPress={cancelEditing} disabled={saving} />
             <ActionButton title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
@@ -118,7 +124,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
         <View style={styles.card}>
-          <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ')}</Text>
+          <Text style={styles.name}>{[profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.username}</Text>
           <Text style={styles.muted}>@{profile.username} · {profile.email}</Text>
           <Detail label="Study preferences" value={profile.study_preferences} />
           <ActionButton title="Edit profile" onPress={startEditing} />
