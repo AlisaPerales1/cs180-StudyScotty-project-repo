@@ -1,15 +1,15 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .profile_serializers import ProfileSerializer
+from moderation.permissions import IsUnrestrictedUser
 
 
 class CurrentProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsUnrestrictedUser]
 
     def get(self, request):
         user = get_user_model().objects.select_related("profile").get(pk=request.user.pk)

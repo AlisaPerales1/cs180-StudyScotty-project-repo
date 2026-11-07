@@ -21,14 +21,14 @@ Django admin is available separately at `/admin/` and uses Django session authen
 
 ## Reserved feature prefixes
 
-These URL includes define feature ownership. Accounts now implements `me/`; the remaining prefixes contain no feature endpoints yet:
+These URL includes define feature ownership. Accounts implements `me/` and moderation implements the account actions below; other feature endpoints remain pending:
 
 | Prefix | Owner app | Scope |
 | --- | --- | --- |
 | `/accounts/` | accounts | Registration, login, UCR verification, profile, courses |
 | `/spots/` | spots | Spots, photos, hours, reviews, favorites, busyness |
 | `/study-sessions/` | study_sessions | Sessions, RSVPs, attendance |
-| `/moderation/` | moderation | Abuse reports and creation restrictions |
+| `/moderation/` | moderation | Account actions; abuse reports and creation restrictions remain pending |
 
 ## Contract work before feature implementation
 
@@ -152,3 +152,84 @@ and continues to use the same `study_preferences` key in `getProfile()` and
 `updateProfile()`. It still uses the in-memory adapter until mobile credentials
 and real profile requests are integrated; saving in the app currently does not
 exercise these backend endpoints.
+
+## Admin account moderation
+
+These endpoints are implemented independently of report submission and mobile
+signup/login. Admin means an authenticated user with `is_staff=true`,
+`is_active=true`, and no effective account restriction. Developers assign staff
+access out of band; these endpoints never grant privileges. A superuser must
+also have `is_staff=true`. No extra moderator group is required.
+
+All paths below are relative to `/api/v1/`. POST JSON only; session-authenticated
+writes require CSRF. Current session/basic authentication is unchanged.
+
+| Method/path | JSON body | Result |
+| --- | --- | --- |
+| POST `/moderation/users/{id}/suspend/` | `{"reason": "Repeated abuse", "ends_at": "2027-01-15T18:00:00Z"}` | Suspend until a future instant. |
+| POST `/moderation/users/{id}/ban/` | `{"reason": "Continued abuse"}` | Ban indefinitely. |
+| POST `/moderation/users/{id}/restore/` | `{}` or `{"reason": "Appeal accepted"}` | Lift the current moderation restriction. |
+
+`reason` must be a nonblank string for suspend/ban; restoration allows an
+optional blank reason. Reasons are trimmed. `ends_at` is required only for
+suspend and accepts an ISO 8601 datetime; timezone offsets are normalized and
+datetimes without an offset are interpreted as UTC. Prefer an explicit `Z` or
+offset. The end must be strictly later than the server time at the write.
+Unknown fields, including `performed_by`, `is_staff`, `state`, and `ends_at` on
+ban/restore, return 400. The actor and action time are server-assigned.
+
+Each successful POST returns HTTP 200 with one object, without pagination:
+
+```json
+{
+  "user_id": 42,
+  "state": "suspended",
+  "ends_at": "2027-01-15T18:00:00Z"
+}
+```
+
+`state` is `active`, `suspended`, or `banned`. `ends_at` is null for active or
+banned accounts. This describes moderation state, separately from Django's
+`is_active` flag. Restoration does not enable an account manually disabled via
+that flag, change credentials/privileges, or lift session-creation restrictions.
+
+Transitions and duplicate handling:
+
+- Active accounts can be suspended or banned. Restoring an active account is a
+  successful no-op, including when its last suspension has expired.
+- A suspended account can be banned, restored, or given a replacement expiry.
+  Suspending it with the exact current expiry is a successful no-op.
+- A banned account can be restored. Repeating a ban is a successful no-op;
+  attempting to suspend it returns 409 until restored.
+- No-ops still validate the request body and target permissions, but create no
+  history and do not replace the existing reason.
+- At `now >= ends_at`, the latest suspension no longer blocks access. No job or
+  database update is required, and superseded restrictions never reactivate.
+
+Admins cannot act on themselves, staff accounts, or superusers. Users and their
+content are preserved. State changes append an audit row with target, actor,
+action, reason, timestamp, and suspension expiry. Existing sessions/RSVPs are
+not automatically cancelled; those lifecycle decisions remain pending.
+
+| Status | Meaning |
+| --- | --- |
+| 200 | Action applied or valid no-op. |
+| 400 | Missing/invalid fields, invalid expiry, non-object body, or malformed JSON. Field errors map to arrays; parse errors use `detail`. |
+| 403 | Anonymous under current authenticator ordering; non-admin, disabled/restricted actor, protected target, or missing session CSRF. Permission errors use `detail`. Future mobile authentication may return 401 for missing credentials. |
+| 404 | Target user does not exist. |
+| 405 | Unsupported method; only POST and OPTIONS are supported. |
+| 409 | Cannot suspend a banned account; error uses `detail`. |
+| 415 | Unsupported request content type. |
+
+`moderation.permissions.IsUnrestrictedUser` is the default DRF permission and
+is also explicitly used by the current profile endpoint. It checks fresh user
+flags and the latest moderation action on every protected request, so existing
+session/basic credentials lose API access immediately after restriction and
+can work again after expiry/restoration. The public health endpoint remains
+accessible. Views that override permissions must retain this check when they
+require unrestricted accounts; future JWT integration must enforce it for
+protected requests and check account state when issuing/refreshing tokens.
+These actions do not implement login, credential revocation, or an appeal API.
+
+The audit history is read-only in Django admin. The report queue, report review
+endpoints, and moderation history API remain future work.
