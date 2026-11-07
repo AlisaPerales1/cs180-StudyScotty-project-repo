@@ -18,7 +18,7 @@ class SchemaIntegrationTests(DomainTestCase):
             model for label in ["accounts", "spots", "study_sessions", "moderation"]
             for model in apps.get_app_config(label).get_models()
         ]
-        self.assertEqual(len(domain_models), 15)
+        self.assertEqual(len(domain_models), 16)
         tables = connection.introspection.table_names()
         for model in domain_models:
             with self.subTest(model=model.__name__):

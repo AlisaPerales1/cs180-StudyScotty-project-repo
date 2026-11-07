@@ -2,14 +2,14 @@
 
 ## Implemented schema
 
-The backend implements the 15 domain tables in the supplied [ERD](erd.dbml). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
+The backend implements the 15 domain tables in the supplied [ERD](erd.dbml), plus an account moderation action history table (16 total). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
 
 | App | Models | Main relationships |
 | --- | --- | --- |
 | accounts | User, UserProfile, Course, UserCourse | One profile per user; unique user/course membership |
 | spots | Spot, SpotPhoto, OpeningHours, Review, Favorite, BusynessReport | Spot creator, photo uploader, review author, favorites, and busyness reporter |
 | study_sessions | StudySession, RSVP, SessionCheckIn | Session creator/spot/course; unique session/user RSVP; optional check-in busyness report |
-| moderation | AbuseReport, SessionCreationRestriction | Session reports, reporters/reviewers, restricted users, and lifting admins |
+| moderation | AbuseReport, SessionCreationRestriction, AccountModerationAction | Session reports, reporters/reviewers, creation restrictions, and account action history |
 
 All relationships to users use `settings.AUTH_USER_MODEL`. Django's built-in auth, group, permission, admin, and login-session tables also exist. They are omitted from the ERD.
 
@@ -74,11 +74,55 @@ These are conservative implementation defaults for PR review; the source ERD did
 
 Use account deactivation instead of casually deleting users with history. There is no automatic retention/deletion job.
 
+## Account moderation states and history
+
+`moderation.AccountModerationAction` adds an audit table for admin account
+actions. This schema addition is subject to PR review. It is separate from abuse
+reports and from `SessionCreationRestriction`; no report is required to act.
+
+| Field | Rules |
+| --- | --- |
+| `user` | Required target user FK, PROTECT. |
+| `performed_by` | Required acting admin FK, PROTECT. Assigned by the service from the authenticated caller. |
+| `action` | Required choice: `suspend`, `ban`, or `restore`. |
+| `reason` | Required nonblank text for suspend/ban; optional for restore (empty string). API trims and validates strings. |
+| `ends_at` | Required and strictly after `created_at` for suspend; SQL NULL for ban/restore. |
+| `created_at` | Required timezone-aware action instant, server-assigned. |
+
+Database checks enforce the action/expiry combination and nonempty reasons for
+restrictive actions. Whitespace trimming and admin authorization are service/API
+rules. Both FKs preserve history by protecting referenced users from deletion.
+An index on `(user, -created_at, -id)` supports latest-action lookup.
+
+State is derived from the newest action, ordered by `created_at` then `id`:
+no action or restore means active; ban means banned; suspend means suspended
+only while `now < ends_at`. Expiry never reveals an earlier restriction. History
+is appended by the service and cannot be added, changed, or deleted in Django
+admin; direct SQL/ORM writes remain privileged operations, not database-enforced
+immutability. A replacement suspension appends a new action. Duplicate ban,
+restore of an active account, and suspension with an unchanged effective expiry
+are no-ops without new rows. Suspend of a banned account is rejected.
+
+`User.is_active` is intentionally independent: moderation actions never change
+it, and restoration cannot undo an unrelated manual disabling. Protected API
+requests require both that flag and an effective active moderation state.
+`is_staff` grants admin action access; developers provision it out of band.
+The service rejects actions against the caller, staff users, and superusers.
+
+The service locks the target user inside a transaction before checking/writing
+state, serializing actions on PostgreSQL. SQLite does not implement row-level
+`SELECT FOR UPDATE`; concurrent writes can encounter SQLite lock errors.
+No scheduled expiration job is needed. These actions leave sessions, RSVPs,
+content, and session-creation restrictions unchanged; automatic session
+cancellation and related lifecycle policy remain unresolved.
+
+Apply the new table with `python manage.py migrate` from `backend/`.
+
 ## Validation and feature boundaries
 
 `SessionCheckIn.clean()` rejects a linked report whose spot or reporter differs from the session spot or check-in user. Django admin calls model validation. Ordinary `save()`, `objects.create()`, bulk operations, and queryset updates do not automatically run `full_clean()`; future write services must validate and transact linked records together, including locking if they can be edited concurrently. Do not treat this cross-table check as a database constraint.
 
-This change creates the storage schema, not feature endpoints. GPS proximity, check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic moderation blocks still require feature services. No background process changes session states merely because time passes.
+Most domain models remain storage scaffolds; the profile and admin account actions have feature endpoints. GPS proximity, check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic report-triggered moderation blocks still require feature services. No background process changes session states merely because time passes.
 
 ## Decisions still pending
 
