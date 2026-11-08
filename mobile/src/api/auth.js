@@ -16,3 +16,27 @@ export async function signup(username, email, password) {
     password,
   });
 }
+
+// Log in using a Google account
+export async function loginWithGoogle(idToken) {
+  return apiPost('accounts/google/', {
+    id_token: idToken,
+  });
+}
+
+export async function linkGoogleAccount(
+  idToken,
+  password,
+  accessToken
+) {
+  return apiPost(
+    'accounts/google/link/',
+    {
+      id_token: idToken,
+      password,
+    },
+    {
+      Authorization: `Bearer ${accessToken}`,
+    }
+  );
+}
