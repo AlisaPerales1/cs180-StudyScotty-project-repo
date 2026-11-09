@@ -6,14 +6,18 @@
  * real API can replace this file's internals.
  *
  * Fields mirror spots.Spot and spots.OpeningHours in docs/database.md. Names
- * come from the geotag seed list; the hours are made up for testing and cover
- * each hours_status plus overnight and split-day schedules.
+ * and approximate coordinates come from the geotag seed list; the hours are
+ * made up for testing and cover each hours_status plus overnight and split-day
+ * schedules. Coordinates are strings because Django REST Framework serializes
+ * DecimalField values as strings by default.
  */
 
 /**
  * @typedef {{
  *   id: number,
  *   name: string,
+ *   latitude: string,
+ *   longitude: string,
  *   hours_status: import('../lib/hours').HoursStatus,
  *   timezone: string,
  *   opening_hours: import('../lib/hours').OpeningInterval[],
@@ -30,6 +34,8 @@ export const MOCK_SPOTS = [
   {
     id: 1,
     name: 'Rivera Library',
+    latitude: '33.974100',
+    longitude: '-117.328200',
     hours_status: 'scheduled',
     timezone: 'America/Los_Angeles',
     opening_hours: [
@@ -43,6 +49,8 @@ export const MOCK_SPOTS = [
   {
     id: 2,
     name: 'Orbach Science Library',
+    latitude: '33.974500',
+    longitude: '-117.325600',
     hours_status: 'scheduled',
     timezone: 'America/Los_Angeles',
     opening_hours: [
@@ -54,6 +62,8 @@ export const MOCK_SPOTS = [
   {
     id: 3,
     name: 'Student Success Center',
+    latitude: '33.975700',
+    longitude: '-117.327000',
     hours_status: 'always_accessible',
     timezone: 'America/Los_Angeles',
     opening_hours: [],
@@ -61,6 +71,8 @@ export const MOCK_SPOTS = [
   {
     id: 4,
     name: 'Bell Tower Lawn',
+    latitude: '33.973800',
+    longitude: '-117.328100',
     hours_status: 'unknown',
     timezone: 'America/Los_Angeles',
     opening_hours: [],
