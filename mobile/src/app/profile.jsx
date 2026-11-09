@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-nati
 import { NAME_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
 import ActionButton from '../components/ActionButton';
 import ConnectionStatus from '../components/ConnectionStatus';
+import FavoriteSpotsList from '../components/FavoriteSpotsList';
 import Screen from '../components/Screen';
 
 /** @param {import('../api/profile').Profile} profile */
@@ -131,6 +132,7 @@ export default function ProfileScreen() {
         </View>
       )}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
+      <FavoriteSpotsList />
       <Text>Sign-in and UCR email verification are coming next.</Text>
       <ConnectionStatus />
     </Screen>
