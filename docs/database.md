@@ -122,13 +122,13 @@ Apply the new table with `python manage.py migrate` from `backend/`.
 
 `SessionCheckIn.clean()` rejects a linked report whose spot or reporter differs from the session spot or check-in user. Django admin calls model validation. Ordinary `save()`, `objects.create()`, bulk operations, and queryset updates do not automatically run `full_clean()`; future write services must validate and transact linked records together, including locking if they can be edited concurrently. Do not treat this cross-table check as a database constraint.
 
-Most domain models remain storage scaffolds; the profile and admin account actions have feature endpoints. GPS proximity, check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic report-triggered moderation blocks still require feature services. No background process changes session states merely because time passes.
+Most domain models remain storage scaffolds; the profile, admin account actions, and spot reviews, favorites, busyness reports, and read-only hours have feature endpoints. The shared GPS proximity check is `common/proximity.py`; busyness reports use it, and the endpoint sets `expires_at` one hour after the report (provisional, see below). Session check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic report-triggered moderation blocks still require feature services. No background process changes session states merely because time passes.
 
 ## Decisions still pending
 
 - UCR ownership verification, email login/uniqueness, and blank emails on any existing accounts.
 - Whether reviews are limited to one per user per spot; no such unique constraint is currently imposed.
-- One-hour versus two-hour busyness freshness; callers must specify expiry.
+- One-hour versus two-hour busyness freshness. The model still requires an explicit expiry; the busyness endpoint provisionally uses one hour (`spots/services.py`).
 - Whether the one-active/upcoming-session limit applies to creation, participation, or both.
 - Whether the creator consumes an RSVP/capacity slot; session transitions, duplicate check-ins, and cancellation/rejoin policies.
 - Automatic restriction thresholds/duration, moderation retention, photo provider, and any revisions to the conservative deletion policy.

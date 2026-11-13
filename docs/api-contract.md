@@ -21,12 +21,12 @@ Django admin is available separately at `/admin/` and uses Django session authen
 
 ## Reserved feature prefixes
 
-These URL includes define feature ownership. Accounts implements `me/` and moderation implements the account actions below; other feature endpoints remain pending:
+These URL includes define feature ownership. Accounts implements `me/`, moderation implements the account actions below, and spots implements reviews, favorites, busyness check-ins, and read-only hours; other feature endpoints remain pending:
 
 | Prefix | Owner app | Scope |
 | --- | --- | --- |
 | `/accounts/` | accounts | Registration, login, UCR verification, profile, courses |
-| `/spots/` | spots | Spots, photos, hours, reviews, favorites, busyness |
+| `/spots/` | spots | Reviews, favorites, busyness, and hours are implemented; spot list/detail, creation, and photos remain pending |
 | `/study-sessions/` | study_sessions | Sessions, RSVPs, attendance |
 | `/moderation/` | moderation | Account actions; abuse reports and creation restrictions remain pending |
 
@@ -233,3 +233,161 @@ These actions do not implement login, credential revocation, or an appeal API.
 
 The audit history is read-only in Django admin. The report queue, report review
 endpoints, and moderation history API remain future work.
+
+## Spot reviews, favorites, busyness, and hours
+
+Paths are relative to `/api/v1/spots/`. Every endpoint requires an
+authenticated, unrestricted account (`IsUnrestrictedUser`), like the profile
+endpoint: anonymous, disabled, suspended, and banned users receive 403 under the
+current authenticator ordering. Writes accept JSON only (415 otherwise), and
+session-authenticated writes require CSRF. An unknown `{spot_id}` returns 404.
+
+Request bodies are strict: unknown or read-only keys return 400 with
+`"Unknown field."` or `"This field is read-only."`, and values must have the
+documented JSON type (for example, `"4"` and `true` are not ratings). Errors use
+the same field-name-to-message-array format as the profile endpoint. The author,
+reporter, favorite owner, spot, and all timestamps come from the request URL,
+the authenticated user, and the server clock, never from the body.
+
+Spot list/detail routes (`""` and `{spot_id}/`) are reserved for the spot map
+feature and are not part of this section.
+
+### Reviews
+
+| Method/path | Result |
+| --- | --- |
+| GET `{spot_id}/reviews/` | 200, paginated (`count`, `next`, `previous`, `results`), newest first. |
+| POST `{spot_id}/reviews/` | 201 with the created review. |
+| GET `{spot_id}/reviews/summary/` | 200 with the rating summary below. |
+| PATCH `reviews/{review_id}/` | 200 with the updated review; author only (403 otherwise). |
+| DELETE `reviews/{review_id}/` | 204; author only (403 otherwise). |
+
+POST and PATCH accept `rating` (JSON integer 1 to 5; required on POST) and
+`comment` (string, optional, trimmed, up to 2000 characters; defaults to `""`).
+PATCH is partial; PUT returns 405. Review object:
+
+```json
+{
+  "id": 12,
+  "spot": 1,
+  "author": {"username": "scotty", "first_name": "Scotty", "last_name": "Highlander"},
+  "rating": 4,
+  "comment": "Quiet upstairs.",
+  "created_at": "2026-11-13T21:05:00Z",
+  "updated_at": "2026-11-13T21:05:00Z",
+  "is_author": true
+}
+```
+
+`is_author` tells the app whether to show edit/delete controls. Summary
+(`average` is null and every count is 0 when a spot has no reviews):
+
+```json
+{"spot": 1, "average": 4.0, "review_count": 4, "counts": {"1": 0, "2": 0, "3": 1, "4": 2, "5": 1}}
+```
+
+Whether a user may review a spot only once is still pending (see
+`docs/database.md`). Until the team decides, repeated reviews are accepted and no
+uniqueness constraint is added.
+
+### Favorites
+
+| Method/path | Result |
+| --- | --- |
+| GET `favorites/` | 200, the caller's favorites only, paginated, newest first. |
+| GET `{spot_id}/favorite/` | 200 with the favorite, or 404 with `{"detail": "This spot is not in your favorites."}`. |
+| PUT `{spot_id}/favorite/` | 201 when created, 200 when it already existed. Idempotent. |
+| DELETE `{spot_id}/favorite/` | 204, including when the spot was not a favorite. |
+
+PUT accepts `{}` or `{"opening_reminder_enabled": true|false}` (JSON boolean).
+A new favorite defaults to `false`; omitting the field on an existing favorite
+leaves it unchanged. There is at most one favorite per user and spot, enforced
+by the existing database constraint. Favorite object:
+
+```json
+{"spot": {"id": 1, "name": "Rivera Library"}, "opening_reminder_enabled": false, "created_at": "2026-11-13T21:05:00Z"}
+```
+
+`opening_reminder_enabled` only records the user's choice. Reminders themselves
+are local notifications scheduled by the app (AGENTS.md); the server sends none.
+When the app removes a favorite it should also cancel that spot's local
+reminders.
+
+### Busyness check-ins
+
+| Method/path | Result |
+| --- | --- |
+| GET `{spot_id}/busyness/` | 200 with the current summary. |
+| POST `{spot_id}/busyness/` | 201 with the created report, or 400 if the caller is too far away. |
+
+POST body:
+
+```json
+{"level": "some_seats", "latitude": 33.97412, "longitude": -117.32818, "accuracy": 12.5}
+```
+
+`level` is `empty`, `some_seats`, or `packed`. `latitude` (-90 to 90) and
+`longitude` (-180 to 180) are required JSON numbers; `accuracy` is the GPS
+accuracy in meters (a number of at least 0, optional, nullable). Coordinates are
+used only for the proximity check and are not stored.
+
+The server checks proximity with `common/proximity.py`: the caller must be within
+100 m of the spot, forgiving up to 50 m of reported GPS error. Too far returns
+400 with a `location` message that includes the approximate distance:
+
+```json
+{"location": ["You are about 656 m from this spot. Move within 100 m to report how busy it is."]}
+```
+
+The server sets `reported_at` to now and `expires_at` one hour later.
+**Provisional:** the proposal gives both about one and about two hours; one hour
+matches the mobile app until the team records a decision. Report object (the
+reporter is not exposed):
+
+```json
+{"id": 31, "spot": 1, "level": "packed", "reported_at": "2026-11-13T21:05:00Z", "expires_at": "2026-11-13T22:05:00Z"}
+```
+
+GET summary over unexpired reports only. The latest report sets `level`; `level`
+null means Unknown (no current reports), and the app shows the report's age from
+`reported_at`:
+
+```json
+{
+  "spot": 1,
+  "level": "some_seats",
+  "reported_at": "2026-11-13T21:05:00Z",
+  "expires_at": "2026-11-13T22:05:00Z",
+  "report_count": 3,
+  "counts": {"empty": 0, "some_seats": 1, "packed": 2}
+}
+```
+
+Positions are client-reported, so the proximity check deters casual misuse but
+does not prove presence. There is no rate limit on repeated check-ins yet.
+Session check-ins should reuse `common/proximity.py` when implemented.
+
+### Hours
+
+GET `{spot_id}/hours/` returns 200 (read-only; other methods return 405):
+
+```json
+{
+  "spot": 1,
+  "hours_status": "scheduled",
+  "timezone": "America/Los_Angeles",
+  "opening_hours": [
+    {"weekday": 0, "opens_at": "08:00:00", "closes_at": "12:00:00", "closes_next_day": false},
+    {"weekday": 4, "opens_at": "20:00:00", "closes_at": "02:00:00", "closes_next_day": true}
+  ]
+}
+```
+
+`hours_status` is `unknown`, `always_accessible`, or `scheduled`. Intervals are
+listed only for `scheduled` spots, sorted by weekday (0 = Monday) and opening
+time, using the rules in `docs/database.md`. Setting hours belongs to spot
+creation and is not part of this endpoint.
+
+The mobile app still uses in-memory adapters (`api/reviews.js`,
+`api/favorites.js`, `api/busyness.js`, `api/spots.js`) until mobile credentials
+are integrated; they use these field names so they can switch to these routes.
