@@ -50,6 +50,8 @@ Scan the QR code with Expo Go, or use `npm run ios` / `npm run android` with a s
 
 Discover shows a UCR campus map. Study Circles and Profile provide starting screens for feature work. Profile checks connectivity to the health endpoint and offers a retry button.
 
+The **Admin demo** tab provides mock account search, suspension (1 hour, 24 hours, or 7 days), banning, and restoration with confirmation. Select a sample account, enter a reason, and confirm an action to see its status update. Data is in memory and resets on app reload. The tab is visible for demo purposes; authenticated staff access and backend integration are pending. Mock moderation lives in `mobile/src/api/moderation.js`.
+
 ### Connect a physical phone
 
 1. Connect the phone and computer to the same Wi-Fi network.
