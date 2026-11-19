@@ -52,6 +52,10 @@ Discover shows a UCR campus map. Study Circles and Profile provide starting scre
 
 The **Admin demo** tab provides mock account search, suspension (1 hour, 24 hours, or 7 days), banning, and restoration with confirmation. Select a sample account, enter a reason, and confirm an action to see its status update. Data is in memory and resets on app reload. The tab is visible for demo purposes; authenticated staff access and backend integration are pending. Mock moderation lives in `mobile/src/api/moderation.js`.
 
+For the mock reporting flow, open **Profile → Report a user · Demo**, or **Study Circles → Report session**. Reporting as sample user `scotty`, enter a required reason and optional context, then submit. Open **Admin demo → View user and session reports** to see submitted/received counts, filter by target type and pending/reviewed/dismissed status, and open report details. Submitting a report does not change session availability or account access. New submissions appear immediately in the shared in-memory list and reset on app reload.
+
+For pending session reports, admins can enter a review reason and dismiss the report or confirm session cancellation. Cancellation marks the report reviewed and preserves the session, cancellation actor/time/reason, and all reports. Other reports remain pending. Study Circles shows the cancellation immediately. Submitted counts include both types; received counts include direct user reports only. RSVP/check-in/reminder integration is not implemented. All review/cancellation behavior is provisional mock UI policy; direct user targets and backend API/schema decisions still require agreement because the backend currently uses session-based abuse reports.
+
 ### Connect a physical phone
 
 1. Connect the phone and computer to the same Wi-Fi network.

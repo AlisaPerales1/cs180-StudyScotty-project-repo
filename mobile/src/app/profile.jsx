@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NAME_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
@@ -133,6 +134,7 @@ export default function ProfileScreen() {
       )}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       <FavoriteSpotsList />
+      <Link href="/report" style={styles.message}>Report a user · Demo</Link>
       <Text>Sign-in and UCR email verification are coming next.</Text>
       <ConnectionStatus />
     </Screen>

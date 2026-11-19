@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { getModerationAccounts, moderateAccount } from '../api/moderation';
@@ -62,6 +63,7 @@ export default function AdminScreen() {
 
   return (
     <Screen title="Account moderation" subtitle="Manage access to StudyScotty.">
+      <Link href="/admin-reports" style={styles.status}>View user and session reports</Link>
       <View style={styles.notice}>
         <Text style={styles.heading}>Admin demo · Mock data</Text>
         <Text style={styles.muted}>Changes affect sample accounts only and reset on app reload. Admin sign-in is not connected.</Text>

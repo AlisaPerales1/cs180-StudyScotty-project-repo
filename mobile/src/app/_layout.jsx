@@ -36,6 +36,9 @@ export default function RootLayout() {
           options={{ title: 'Admin demo' }}
         />
 
+        <Tabs.Screen name="report" options={{ href: null }} />
+        <Tabs.Screen name="admin-reports" options={{ href: null }} />
+
         <Tabs.Screen
           name="login"
           options={{
