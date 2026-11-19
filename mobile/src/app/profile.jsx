@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NAME_MAX_LENGTH, getProfile, updateProfile } from '../api/profile';
+import { clearTokens } from '../api/tokenStorage';
+import { GOOGLE_SIGN_IN_ENABLED } from '../api/googleAuth';
 import ActionButton from '../components/ActionButton';
 import ConnectionStatus from '../components/ConnectionStatus';
 import FavoriteSpotsList from '../components/FavoriteSpotsList';
@@ -38,6 +41,7 @@ function toChanges(draft) {
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState(/** @type {import('../api/profile').Profile | null} */ (null));
   const [loadError, setLoadError] = useState('');
   const [editing, setEditing] = useState(false);
@@ -47,13 +51,21 @@ export default function ProfileScreen() {
   const [message, setMessage] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
+    // Tabs can stay mounted across logout/login; always reload the current user.
+    setProfile(null);
+    setLoadError('');
+    setEditing(false);
+    setDraft(null);
+    setMessage('');
     getProfile()
       .then((data) => { if (active) setProfile(data); })
       .catch(() => { if (active) setLoadError('Could not load your profile.'); });
     return () => { active = false; };
-  }, [loadAttempt]);
+    // Explicit retry deliberately recreates the focus effect and cancels its prior request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadAttempt]));
 
   const retryLoad = () => {
     setLoadError('');
@@ -133,7 +145,18 @@ export default function ProfileScreen() {
       )}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       <FavoriteSpotsList />
-      <Text>Sign-in and UCR email verification are coming next.</Text>
+      {GOOGLE_SIGN_IN_ENABLED && (
+        <ActionButton title="Link Google Account" onPress={() => router.push('/link-google')} />
+      )}
+      <Text>UCR email ownership verification is not available yet.</Text>
+      <ActionButton title="Log out" variant="secondary" onPress={async () => {
+        try {
+          await clearTokens();
+          router.replace('/login');
+        } catch {
+          setMessage('Could not log out. Please try again.');
+        }
+      }} />
       <ConnectionStatus />
     </Screen>
   );
