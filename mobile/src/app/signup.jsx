@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,22 +20,30 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (title, message) => {
+    setErrorMessage(`${title}: ${message}`);
+    // React Native Web's Alert.alert is a no-op; inline feedback works everywhere.
+    if (Platform.OS !== 'web') Alert.alert(title, message);
+  };
 
   const handleSignup = async () => {
+    setErrorMessage('');
   if (
     !name.trim() ||
     !email.trim() ||
     !password ||
     !confirmPassword
   ) {
-    Alert.alert('Error', 'Please fill in all fields.');
+    showError('Error', 'Please fill in all fields.');
     return;
   }
 
   const ucrEmailRegex = /^[^\s@]+@ucr\.edu$/i;
 
   if (!ucrEmailRegex.test(email.trim())) {
-    Alert.alert(
+    showError(
       'Invalid Email',
       'Please use a valid UCR email address.'
     );
@@ -42,7 +51,7 @@ export default function SignupScreen() {
   }
 
   if (password.length < 8) {
-    Alert.alert(
+    showError(
       'Weak Password',
       'Password must be at least 8 characters long.'
     );
@@ -50,7 +59,7 @@ export default function SignupScreen() {
   }
 
   if (password !== confirmPassword) {
-    Alert.alert(
+    showError(
       'Password Mismatch',
       'Passwords do not match.'
     );
@@ -66,7 +75,7 @@ export default function SignupScreen() {
     // Email ownership verification is not implemented yet.
     router.replace('/login');
   } catch (error) {
-    Alert.alert(
+    showError(
       'Sign Up Failed',
       error.message || 'Unable to create your account.'
     );
@@ -82,6 +91,11 @@ export default function SignupScreen() {
     >
       <Text style={styles.title}>StudyScotty</Text>
       <Text style={styles.subtitle}>Create Your Account</Text>
+      {errorMessage ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>
+          {errorMessage}
+        </Text>
+      ) : null}
 
       <TextInput
       style={styles.input}
@@ -158,6 +172,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 35,
   },
+  error: { color: '#b42318', marginBottom: 16, fontSize: 15 },
   input: {
     borderWidth: 1,
     borderColor: '#CCCCCC',

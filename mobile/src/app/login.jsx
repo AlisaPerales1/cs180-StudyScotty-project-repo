@@ -24,16 +24,24 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (title, message) => {
+    setErrorMessage(`${title}: ${message}`);
+    // React Native Web's Alert.alert is a no-op; inline feedback works everywhere.
+    if (Platform.OS !== 'web') Alert.alert(title, message);
+  };
 
   // Regular email/password login
   const handleLogin = async () => {
+    setErrorMessage('');
     if (!email.trim() || !password) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      showError('Error', 'Please fill in all fields.');
       return;
     }
 
     if (!email.trim().toLowerCase().endsWith('@ucr.edu')) {
-      Alert.alert('Invalid Email', 'Please use your UCR email.');
+      showError('Invalid Email', 'Please use your UCR email.');
       return;
     }
 
@@ -58,7 +66,7 @@ export default function LoginScreen() {
     } catch (error) {
       console.error('Login error:', error);
 
-      Alert.alert(
+      showError(
         'Login Failed',
         error.message || 'Unable to connect to the server.'
       );
@@ -69,8 +77,9 @@ export default function LoginScreen() {
 
   // Google Sign-In with Django backend
   const handleGoogleLogin = async () => {
+    setErrorMessage('');
     if (Platform.OS === 'web') {
-      Alert.alert(
+      showError(
         'Not Available',
         'Google Sign-In for web is coming soon.'
       );
@@ -112,7 +121,7 @@ export default function LoginScreen() {
     } catch (error) {
       console.error('Google Sign-In error:', error);
 
-      Alert.alert(
+      showError(
         'Google Sign-In Failed',
         error.message || 'Unable to sign in with Google.'
       );
@@ -125,6 +134,11 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>StudyScotty</Text>
       <Text style={styles.subtitle}>Welcome Back!</Text>
+      {errorMessage ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>
+          {errorMessage}
+        </Text>
+      ) : null}
 
       <TextInput
         style={styles.input}
@@ -194,6 +208,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 35,
   },
+  error: { color: '#b42318', marginBottom: 16, fontSize: 15 },
   input: {
     borderWidth: 1,
     borderColor: '#CCCCCC',
