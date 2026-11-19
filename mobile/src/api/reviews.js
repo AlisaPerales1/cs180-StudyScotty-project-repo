@@ -12,6 +12,7 @@
  */
 
 import { getProfile } from './profile';
+import { MOCK_SPOTS } from './spots';
 
 /**
  * @typedef {{ username: string, first_name: string, last_name: string }} ReviewAuthor
@@ -29,13 +30,6 @@ import { getProfile } from './profile';
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
-
-/** Placeholder spots (names from the geotag seed list) until the spots API is connected. */
-export const MOCK_SPOTS = [
-  { id: 1, name: 'Rivera Library' },
-  { id: 2, name: 'Orbach Science Library' },
-  { id: 3, name: 'Student Success Center' },
-];
 
 const daysAgo = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
@@ -67,7 +61,7 @@ export async function getSpotSummary(spotId) {
   await delay(MOCK_LATENCY_MS);
   const spot = MOCK_SPOTS.find((item) => item.id === spotId);
   if (!spot) throw new Error('Spot not found');
-  return { ...spot };
+  return { id: spot.id, name: spot.name };
 }
 
 /** Newest first. @param {number} spotId @returns {Promise<Review[]>} */

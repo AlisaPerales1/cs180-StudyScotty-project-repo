@@ -1,0 +1,79 @@
+# StudyScotty: Alisa's Week 6 backend (opening hours + nearby-spot duplicate check)
+# One file. Each section says which file it goes in.
+#
+# After editing:
+#   python manage.py makemigrations spots
+#   python manage.py migrate
+
+
+# ===================== spots/models.py  (add these 2 fields to Spot) =====================
+    opens_at = models.TimeField(null=True, blank=True)   # empty = "always accessible"
+    closes_at = models.TimeField(null=True, blank=True)
+
+
+# ===================== spots/serializers.py  (replace SpotSerializer) ====================
+from rest_framework import serializers
+from .models import Spot
+
+
+class SpotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Spot
+        fields = [
+            "id", "name", "description", "location_details", "photo",
+            "latitude", "longitude",
+            "noise_level", "has_outlets", "has_wifi", "is_indoor", "group_friendly",
+            "opens_at", "closes_at",
+        ]
+
+    def validate(self, data):
+        # hours must be given together or not at all
+        if bool(data.get("opens_at")) != bool(data.get("closes_at")):
+            raise serializers.ValidationError("Provide both opens_at and closes_at, or neither.")
+        return data
+
+
+# ===================== spots/views.py  (add these imports and the new view) ==============
+import math
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+
+
+def distance_meters(lat1, lng1, lat2, lng2):
+    r = 6371000
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dlat = p2 - p1
+    dlng = math.radians(lng2 - lng1)
+    h = math.sin(dlat / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlng / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def nearby_spots(request):
+    """GET /api/spots/nearby/?lat=..&lng=..&radius=30  -> spots within radius meters, closest first"""
+    try:
+        lat = float(request.query_params["lat"])
+        lng = float(request.query_params["lng"])
+        radius = float(request.query_params.get("radius", 30))
+    except (KeyError, ValueError):
+        return Response({"detail": "lat and lng are required numbers."}, status=400)
+
+    results = []
+    for spot in Spot.objects.all():
+        d = distance_meters(lat, lng, spot.latitude, spot.longitude)
+        if d <= radius:
+            results.append({"id": spot.id, "name": spot.name, "distance_m": round(d, 1)})
+    results.sort(key=lambda r: r["distance_m"])
+    return Response(results)
+
+
+# ===================== spots/views.py  (urlpatterns at the bottom) =======================
+# Put the nearby route BEFORE spots/<int:pk>/
+urlpatterns = [
+    path("spots/", SpotListView.as_view(), name="spot-list"),
+    path("spots/nearby/", nearby_spots, name="spot-nearby"),
+    path("spots/<int:pk>/", SpotDetailView.as_view(), name="spot-detail"),
+]

@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import RegisterSerializer, LoginSerializer, require_unrestricted_user
+from moderation.permissions import IsUnrestrictedUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import GoogleIdentity
 
@@ -19,6 +20,7 @@ User = get_user_model()
 
 
 class RegisterView(generics.CreateAPIView):
+    authentication_classes = []
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -42,6 +44,7 @@ class RegisterView(generics.CreateAPIView):
 
 
 class LoginView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -59,6 +62,7 @@ class LoginView(APIView):
 
 
 class GoogleLoginView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -157,6 +161,7 @@ class GoogleLoginView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
+        require_unrestricted_user(user)
         # Issue StudyScotty JWT tokens.
         refresh = RefreshToken.for_user(user)
 
@@ -175,7 +180,7 @@ class GoogleLoginView(APIView):
 
 class GoogleLinkView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsUnrestrictedUser]
 
     def post(self, request):
         # Step 1: Verify the user's StudyScotty password.
@@ -301,4 +306,3 @@ class GoogleLinkView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-

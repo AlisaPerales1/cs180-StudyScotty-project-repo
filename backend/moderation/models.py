@@ -1,6 +1,46 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
+from django.utils import timezone
+
+
+class AccountModerationAction(models.Model):
+    """Append-only history; the latest action determines the effective state."""
+
+    class Action(models.TextChoices):
+        SUSPEND = "suspend", "Suspend"
+        BAN = "ban", "Ban"
+        RESTORE = "restore", "Restore"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="account_moderation_actions",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="performed_account_moderation_actions",
+    )
+    action = models.CharField(max_length=10, choices=Action)
+    reason = models.TextField(blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["user", "-created_at", "-id"], name="account_action_latest_idx")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(action="suspend", ends_at__isnull=False, ends_at__gt=F("created_at"))
+                    | Q(action__in=["ban", "restore"], ends_at__isnull=True)
+                ),
+                name="account_action_expiry_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(action="restore") | ~Q(reason=""),
+                name="account_action_reason_required",
+            ),
+        ]
 
 
 class AbuseReport(models.Model):

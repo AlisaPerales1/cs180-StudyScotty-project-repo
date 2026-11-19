@@ -2,20 +2,25 @@
 
 ## Implemented schema
 
-The backend implements the 15 domain tables in the supplied [ERD](erd.dbml). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
+The backend implements the 15 domain tables in the supplied [ERD](erd.dbml), plus account moderation action history and Google identity tables (17 total). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
 
 | App | Models | Main relationships |
 | --- | --- | --- |
-| accounts | User, UserProfile, Course, UserCourse | One profile per user; unique user/course membership |
+| accounts | User, UserProfile, Course, UserCourse, GoogleIdentity | One profile and Google identity per user; unique user/course membership |
 | spots | Spot, SpotPhoto, OpeningHours, Review, Favorite, BusynessReport | Spot creator, photo uploader, review author, favorites, and busyness reporter |
 | study_sessions | StudySession, RSVP, SessionCheckIn | Session creator/spot/course; unique session/user RSVP; optional check-in busyness report |
-| moderation | AbuseReport, SessionCreationRestriction | Session reports, reporters/reviewers, restricted users, and lifting admins |
+| moderation | AbuseReport, SessionCreationRestriction, AccountModerationAction | Session reports, reporters/reviewers, creation restrictions, and account action history |
 
 All relationships to users use `settings.AUTH_USER_MODEL`. Django's built-in auth, group, permission, admin, and login-session tables also exist. They are omitted from the ERD.
 
-`User` retains `AbstractUser` and username/password login. Email is now required by model/admin validation, without introducing email uniqueness or enforcing a UCR domain. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile.
+`User` retains `AbstractUser`. Mobile login uses email/password; admin and development basic authentication still use username/password. Email is required by model/admin validation. Migration `0004_unique_login_email` adds a unique index on `Lower(email)` for nonblank emails, preventing concurrent/case-variant duplicates. Signup trims and lowercases email and enforces `@ucr.edu`; domain validation is not ownership verification. Legacy blank emails remain allowed at the database level so existing users and developer fixtures are not rewritten. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile. The profile API reads a missing profile as empty study preferences and creates the row on a valid preferences update. Profile updates do not change the schema.
 
 Optional text uses empty strings following Django conventions, including inherited first/last names, descriptions, storage keys, comments, and cancellation reasons. Unknown noise and amenity values remain SQL NULL, as in the ERD. Photos are storage references; no upload provider is configured.
+
+`UserProfile.study_preferences` also stores the profile bio/description used
+by the frontend. It is optional plain text stored as an empty string when
+cleared; there are no separate bio/description columns or new migrations.
+Profile GET/PATCH uses the existing field, preserving the agreed schema.
 
 ## Database connection and setup
 
@@ -69,15 +74,59 @@ These are conservative implementation defaults for PR review; the source ERD did
 
 Use account deactivation instead of casually deleting users with history. There is no automatic retention/deletion job.
 
+## Account moderation states and history
+
+`moderation.AccountModerationAction` adds an audit table for admin account
+actions. This schema addition is subject to PR review. It is separate from abuse
+reports and from `SessionCreationRestriction`; no report is required to act.
+
+| Field | Rules |
+| --- | --- |
+| `user` | Required target user FK, PROTECT. |
+| `performed_by` | Required acting admin FK, PROTECT. Assigned by the service from the authenticated caller. |
+| `action` | Required choice: `suspend`, `ban`, or `restore`. |
+| `reason` | Required nonblank text for suspend/ban; optional for restore (empty string). API trims and validates strings. |
+| `ends_at` | Required and strictly after `created_at` for suspend; SQL NULL for ban/restore. |
+| `created_at` | Required timezone-aware action instant, server-assigned. |
+
+Database checks enforce the action/expiry combination and nonempty reasons for
+restrictive actions. Whitespace trimming and admin authorization are service/API
+rules. Both FKs preserve history by protecting referenced users from deletion.
+An index on `(user, -created_at, -id)` supports latest-action lookup.
+
+State is derived from the newest action, ordered by `created_at` then `id`:
+no action or restore means active; ban means banned; suspend means suspended
+only while `now < ends_at`. Expiry never reveals an earlier restriction. History
+is appended by the service and cannot be added, changed, or deleted in Django
+admin; direct SQL/ORM writes remain privileged operations, not database-enforced
+immutability. A replacement suspension appends a new action. Duplicate ban,
+restore of an active account, and suspension with an unchanged effective expiry
+are no-ops without new rows. Suspend of a banned account is rejected.
+
+`User.is_active` is intentionally independent: moderation actions never change
+it, and restoration cannot undo an unrelated manual disabling. Protected API
+requests require both that flag and an effective active moderation state.
+`is_staff` grants admin action access; developers provision it out of band.
+The service rejects actions against the caller, staff users, and superusers.
+
+The service locks the target user inside a transaction before checking/writing
+state, serializing actions on PostgreSQL. SQLite does not implement row-level
+`SELECT FOR UPDATE`; concurrent writes can encounter SQLite lock errors.
+No scheduled expiration job is needed. These actions leave sessions, RSVPs,
+content, and session-creation restrictions unchanged; automatic session
+cancellation and related lifecycle policy remain unresolved.
+
+Apply the new table with `python manage.py migrate` from `backend/`.
+
 ## Validation and feature boundaries
 
 `SessionCheckIn.clean()` rejects a linked report whose spot or reporter differs from the session spot or check-in user. Django admin calls model validation. Ordinary `save()`, `objects.create()`, bulk operations, and queryset updates do not automatically run `full_clean()`; future write services must validate and transact linked records together, including locking if they can be edited concurrently. Do not treat this cross-table check as a database constraint.
 
-This change creates the storage schema, not feature endpoints. GPS proximity, check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic moderation blocks still require feature services. No background process changes session states merely because time passes.
+Most domain models remain storage scaffolds; the profile and admin account actions have feature endpoints. GPS proximity, check-in authorization/windows, atomic RSVP capacity enforcement, email verification/reset on email changes, local reminder scheduling, no-show expiration, and automatic report-triggered moderation blocks still require feature services. No background process changes session states merely because time passes.
 
 ## Decisions still pending
 
-- UCR ownership verification, email login/uniqueness, and blank emails on any existing accounts.
+- UCR ownership verification and remediation of blank emails on existing accounts; mobile email login and nonblank case-insensitive email uniqueness are implemented.
 - Whether reviews are limited to one per user per spot; no such unique constraint is currently imposed.
 - One-hour versus two-hour busyness freshness; callers must specify expiry.
 - Whether the one-active/upcoming-session limit applies to creation, participation, or both.
@@ -95,3 +144,23 @@ python manage.py test
 ```
 
 Tests exercise database constraints, relationship uniqueness, deletion protection/cascades, linked check-in model validation, and SQLite/PostgreSQL connection URL parsing. Live PostgreSQL verification requires a provisioned server and has not been performed as part of local SQLite setup.
+
+## Authentication integration migrations
+
+`GoogleIdentity` (migration `0003_googleidentity`) has an auto primary key, a
+required unique `google_sub` (maximum 255 characters), a required unique one-to-one
+`user` FK, and an automatic `created_at`. Deleting a user cascades to its identity;
+deleting an identity does not delete the user. Google creation/linking is atomic.
+The identity is visible as read-only fields in Django admin; mobile Google
+entry points remain deferred until native setup is complete. No profile is
+automatically created or marked verified by authentication.
+
+Migration `0004_unique_login_email` first checks existing nonblank emails for
+case-insensitive duplicates. It stops with an explicit error rather than merging,
+deleting, or rewriting accounts. Resolve duplicate ownership explicitly before
+rerunning `python manage.py migrate`; back up deployed data first. The constraint
+and GoogleIdentity are schema changes proposed by this PR and require PR review.
+The API maps a concurrent email or username collision to a 400 field error.
+JWTs are signed credentials, not database rows; automatic token refresh and
+server-side logout/revocation are deferred. Moderation restrictions apply to token
+issuance and every protected request, independently of the manual `is_active` flag.

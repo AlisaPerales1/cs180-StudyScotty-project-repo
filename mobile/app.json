@@ -35,7 +35,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-secure-store"
     ],
     "scheme": "studyscotty"
   }

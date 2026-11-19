@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 
 import { login, loginWithGoogle } from '../api/auth';
 import {
+  GOOGLE_SIGN_IN_ENABLED,
   configureGoogleSignIn,
   signInWithGoogle,
 } from '../api/googleAuth';
@@ -80,7 +81,7 @@ export default function LoginScreen() {
 
     try {
       // Step 1: Configure Google Sign-In
-      configureGoogleSignIn();
+      await configureGoogleSignIn();
 
       // Step 2: Sign in with Google
       const idToken = await signInWithGoogle();
@@ -152,7 +153,7 @@ export default function LoginScreen() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
+      {GOOGLE_SIGN_IN_ENABLED && <TouchableOpacity
         style={styles.googleButton}
         onPress={handleGoogleLogin}
         disabled={loading}
@@ -160,14 +161,14 @@ export default function LoginScreen() {
         <Text style={styles.googleButtonText}>
           {loading ? 'Please wait...' : 'Continue with Google'}
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity>}
 
       <TouchableOpacity
         onPress={() => router.push('/signup')}
         disabled={loading}
       >
         <Text style={styles.link}>
-          Don't have an account? Sign Up
+          Don&apos;t have an account? Sign Up
         </Text>
       </TouchableOpacity>
     </View>

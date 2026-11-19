@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 
 import { getAccessToken } from '../api/tokenStorage';
 import {
+  GOOGLE_SIGN_IN_ENABLED,
   configureGoogleSignIn,
   signInWithGoogle,
 } from '../api/googleAuth';
@@ -25,17 +26,10 @@ export default function LinkGoogleScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLinkGoogle = async () => {
-    const accessToken = await getAccessToken();
-
-if (!accessToken) {
-  throw new Error(
-    'Please log in to StudyScotty before linking Google.'
-  );
-    }
     if (!password) {
       Alert.alert(
         'Missing Information',
-        'Please provide your password and access token.'
+        'Please provide your password.'
       );
       return;
     }
@@ -51,7 +45,11 @@ if (!accessToken) {
     setLoading(true);
 
     try {
-      configureGoogleSignIn();
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Please log in to StudyScotty before linking Google.');
+      }
+      await configureGoogleSignIn();
 
       const idToken = await signInWithGoogle();
 
@@ -69,7 +67,7 @@ if (!accessToken) {
         [
           {
             text: 'OK',
-            onPress: () => router.replace('/discover'),
+            onPress: () => router.replace('/discovery'),
           },
         ]
       );
@@ -105,7 +103,7 @@ if (!accessToken) {
       <TouchableOpacity
         style={styles.button}
         onPress={handleLinkGoogle}
-        disabled={loading}
+        disabled={loading || !GOOGLE_SIGN_IN_ENABLED}
       >
         <Text style={styles.buttonText}>
           {loading ? 'Linking...' : 'Link Google Account'}

@@ -1,12 +1,21 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
 
 
 class User(AbstractUser):
-    """Username login is retained until the UCR verification policy is agreed."""
+    """Email identifies mobile logins; ownership verification remains pending."""
 
     email = models.EmailField(max_length=254)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"), condition=~models.Q(email=""),
+                name="unique_user_email_case_insensitive",
+            ),
+        ]
 
 
 class UserProfile(models.Model):

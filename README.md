@@ -48,7 +48,25 @@ npm start
 
 Scan the QR code with Expo Go, or use `npm run ios` / `npm run android` with a simulator or emulator. `npm run web` provides a browser preview; the native map has a browser fallback.
 
-Discover shows a UCR campus map. Study Circles and Profile provide starting screens for feature work. Profile checks connectivity to the health endpoint and offers a retry button.
+Sign up with a username, UCR email, and strong password, then log in. Signup does
+not verify email ownership; that policy is still pending. Discover shows a UCR
+campus map. Profile loads/saves your real account and provides logout; spots,
+favorites, study circles, and Admin demo still use their existing mock adapters.
+Profile also checks backend health and offers retry.
+
+`npm start` explicitly targets Expo Go. Google Sign-In/linking entry points are
+disabled while preserving their implementation for a follow-up: native plugin,
+iOS/client configuration, and a development build are still required. The backend
+Google routes use optional `GOOGLE_WEB_CLIENT_ID`; password signup/login does not
+need Google credentials. No OAuth client secrets belong in the mobile app.
+
+Access tokens expire after five minutes. Automatic refresh is deferred; a protected
+API request with an expired token clears credentials and returns to login. Native
+tokens use SecureStore; browser tokens reset on reload. Migration `0004` stops if
+existing nonblank emails collide case-insensitively; resolve those accounts
+explicitly before retrying migrations (see [database notes](docs/database.md)).
+
+The **Admin demo** tab provides mock account search, suspension (1 hour, 24 hours, or 7 days), banning, and restoration with confirmation. Select a sample account, enter a reason, and confirm an action to see its status update. Data is in memory and resets on app reload. The tab is visible for demo purposes; authenticated staff access and backend integration are pending. Mock moderation lives in `mobile/src/api/moderation.js`.
 
 ### Connect a physical phone
 
@@ -73,6 +91,7 @@ From `mobile/`:
 ```sh
 npm run lint
 npm run typecheck
+npm test -- --runInBand
 npm run check
 ```
 
@@ -82,5 +101,8 @@ npm run check
 - [API contract and pending decisions](docs/api-contract.md)
 - [Database architecture and connection setup](docs/database.md)
 - [Source database ERD](docs/erd.dbml)
+- ERD:
+<img width="5666" height="4571" alt="image" src="https://github.com/user-attachments/assets/1ba78a10-76cd-4b30-b013-21eb759a2b16" />
+
 
 The backend models and migrations implement all 15 ERD tables. Run `python manage.py migrate` from `backend/` to create or update the configured database. A blank `DATABASE_URL` uses SQLite; set a PostgreSQL URL in `backend/.env` to connect to a provisioned server. See the database architecture document for constraints, deletion policies, and remaining feature logic.

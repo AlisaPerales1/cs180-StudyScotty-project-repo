@@ -1,13 +1,30 @@
 
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { configureNotifications } from '../lib/reminders';
+import { getAccessToken } from '../api/tokenStorage';
+
+configureNotifications();
 
 export default function RootLayout() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    let active = true;
+    if (!['/', '/login', '/signup'].includes(pathname)) {
+      getAccessToken().then((token) => {
+        if (active && !token) router.replace('/login');
+      }).catch(() => {
+        if (active) router.replace('/login');
+      });
+    }
+    return () => { active = false; };
+  }, [pathname]);
+
   return (
     <>
       <StatusBar style="dark" />
-
-      
 
       <Tabs
         initialRouteName="login"
@@ -16,9 +33,11 @@ export default function RootLayout() {
           tabBarActiveTintColor: '#2463a0',
         }}
       >
+        <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="link-google" options={{ href: null }} />
         <Tabs.Screen
-        name="discovery"
-        options={{ title: 'Discovery' }}
+          name="discovery"
+          options={{ title: 'Discovery' }}
         />
 
         <Tabs.Screen
@@ -29,6 +48,11 @@ export default function RootLayout() {
         <Tabs.Screen
           name="profile"
           options={{ title: 'Profile' }}
+        />
+
+        <Tabs.Screen
+          name="admin"
+          options={{ title: 'Admin demo' }}
         />
 
         <Tabs.Screen
@@ -45,6 +69,11 @@ export default function RootLayout() {
             href: null,
             tabBarStyle: { display: 'none' },
           }}
+        />
+
+        <Tabs.Screen
+          name="spots/[id]/index"
+          options={{ href: null }}
         />
 
         <Tabs.Screen

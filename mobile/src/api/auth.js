@@ -5,7 +5,7 @@ export async function login(email, password) {
   return apiPost('accounts/login/', {
     email: email.trim().toLowerCase(),
     password,
-  });
+  }, {}, false);
 }
 
 // Create a new student account
@@ -14,14 +14,14 @@ export async function signup(username, email, password) {
     username: username.trim(),
     email: email.trim().toLowerCase(),
     password,
-  });
+  }, {}, false);
 }
 
 // Log in using a Google account
 export async function loginWithGoogle(idToken) {
   return apiPost('accounts/google/', {
     id_token: idToken,
-  });
+  }, {}, false);
 }
 
 export async function linkGoogleAccount(
