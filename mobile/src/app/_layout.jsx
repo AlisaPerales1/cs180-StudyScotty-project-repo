@@ -32,6 +32,11 @@ export default function RootLayout() {
         />
 
         <Tabs.Screen
+          name="admin"
+          options={{ title: 'Admin demo' }}
+        />
+
+        <Tabs.Screen
           name="login"
           options={{
             href: null,
