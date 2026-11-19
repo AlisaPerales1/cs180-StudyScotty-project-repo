@@ -1,0 +1,307 @@
+// StudyScotty: Alisa's Week 7 (SpotsScreen.js, replaces the week 4 version)
+// Adds: busyness on map pins, list rows and the detail screen,
+//       and a ~100 m distance check before a user can report busyness.
+//
+// Setup: npx expo install react-native-maps expo-location expo-secure-store
+//
+// ASSUMPTIONS ABOUT HENRY'S ENDPOINTS (confirm with him, change the constants below if different):
+//   GET  /api/spots/                 each spot has  busyness: "empty" | "some_seats" | "packed" | null
+//                                                   busyness_reported_at: ISO time string | null
+//   POST /api/spots/<id>/busyness/   body { "status": "empty" | "some_seats" | "packed" }, login required
+
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View, Text, Pressable, FlatList, Modal, ScrollView, Alert,
+  ActivityIndicator, StyleSheet, SafeAreaView,
+} from "react-native";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
+import * as SecureStore from "expo-secure-store";
+
+const API_URL = "http://YOUR_LAN_IP:8000/api"; // or the deployed backend URL
+const TOKEN_KEY = "token";                     // key the login screen saves the token under
+const AUTH_PREFIX = "Token";                   // "Bearer" if DJ uses JWT
+
+const MAX_REPORT_METERS = 100; // must be this close to report busyness
+const STALE_MINUTES = 60;      // reports older than this show "Unknown" (team: pick 1 hr or 2 hrs)
+
+const UCR_REGION = {
+  latitude: 33.9737, longitude: -117.3281,
+  latitudeDelta: 0.02, longitudeDelta: 0.02,
+};
+
+const BUSYNESS = {
+  empty: { label: "Empty", color: "#16a34a" },
+  some_seats: { label: "Some seats", color: "#f59e0b" },
+  packed: { label: "Packed", color: "#dc2626" },
+};
+const UNKNOWN = { label: "Unknown", color: "#9ca3af" };
+
+const FILTERS = [
+  { key: "quiet", label: "Quiet", param: "noise", value: "quiet" },
+  { key: "outlets", label: "Outlets", param: "outlets", value: "true" },
+  { key: "wifi", label: "Wi-Fi", param: "wifi", value: "true" },
+  { key: "indoor", label: "Indoor", param: "indoor", value: "true" },
+  { key: "group", label: "Group-friendly", param: "group_friendly", value: "true" },
+];
+
+// ---------- helpers ----------
+// Distance in meters between two coordinates (haversine)
+function distanceMeters(a, b) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function ageText(minutes) {
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${Math.round(minutes)} min ago`;
+  return `${Math.floor(minutes / 60)} hr ago`;
+}
+
+// { label, color, age } for a spot. Old or missing reports are "Unknown".
+function busynessOf(spot) {
+  const info = BUSYNESS[spot.busyness];
+  if (!info || !spot.busyness_reported_at) return { ...UNKNOWN, age: "" };
+  const minutes = (Date.now() - new Date(spot.busyness_reported_at).getTime()) / 60000;
+  if (minutes > STALE_MINUTES) return { ...UNKNOWN, age: "" };
+  return { ...info, age: ageText(minutes) };
+}
+
+function spotTags(spot) {
+  return [
+    `Noise: ${spot.noise_level}`,
+    spot.has_outlets ? "Outlets" : "No outlets",
+    spot.has_wifi ? "Wi-Fi" : "No Wi-Fi",
+    spot.is_indoor ? "Indoor" : "Outdoor",
+    spot.group_friendly ? "Group-friendly" : "Solo-friendly",
+  ];
+}
+
+function BusyBadge({ spot }) {
+  const b = busynessOf(spot);
+  return (
+    <View style={styles.badge}>
+      <View style={[styles.dot, { backgroundColor: b.color }]} />
+      <Text style={styles.badgeText}>{b.label}{b.age ? ` · ${b.age}` : ""}</Text>
+    </View>
+  );
+}
+
+// ---------- screen ----------
+export default function SpotsScreen() {
+  const [view, setView] = useState("map");
+  const [activeKeys, setActiveKeys] = useState([]);
+  const [spots, setSpots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [reporting, setReporting] = useState(false);
+
+  const loadSpots = useCallback(async () => {
+    const active = FILTERS.filter((f) => activeKeys.includes(f.key));
+    const query = active.map((f) => `${f.param}=${f.value}`).join("&");
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/spots/${query ? "?" + query : ""}`);
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      setSpots(await res.json());
+    } catch (e) {
+      setError("Couldn't load study spots. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeKeys]);
+
+  useEffect(() => { loadSpots(); }, [loadSpots]);
+
+  const toggleFilter = (key) =>
+    setActiveKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
+  // Report busyness, only if the user is within ~100 m of the spot
+  const reportBusyness = async (status) => {
+    if (!selected) return;
+    setReporting(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== "granted") {
+        Alert.alert("Location needed", "Allow location so we can check you're at the spot.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      const meters = distanceMeters(
+        { latitude: loc.coords.latitude, longitude: loc.coords.longitude },
+        { latitude: selected.latitude, longitude: selected.longitude }
+      );
+      if (meters > MAX_REPORT_METERS) {
+        Alert.alert(
+          "Too far away",
+          `You need to be within about ${MAX_REPORT_METERS} m of ${selected.name} to report. You're about ${Math.round(meters)} m away.`
+        );
+        return;
+      }
+
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const res = await fetch(`${API_URL}/spots/${selected.id}/busyness/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `${AUTH_PREFIX} ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+      // show the new report right away, then refresh from the server
+      setSelected({ ...selected, busyness: status, busyness_reported_at: new Date().toISOString() });
+      loadSpots();
+      Alert.alert("Thanks!", "Your report was saved.");
+    } catch (e) {
+      Alert.alert("Couldn't save report", e.message);
+    } finally {
+      setReporting(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipRow}>
+        {FILTERS.map((f) => {
+          const on = activeKeys.includes(f.key);
+          return (
+            <Pressable key={f.key} onPress={() => toggleFilter(f.key)} style={[styles.chip, on && styles.chipOn]}>
+              <Text style={on ? styles.chipTextOn : styles.chipText}>{f.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.toggle}>
+        {["map", "list"].map((v) => (
+          <Pressable key={v} onPress={() => setView(v)} style={[styles.tab, view === v && styles.tabOn]}>
+            <Text style={view === v ? styles.tabTextOn : styles.tabText}>{v === "map" ? "Map" : "List"}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {loading ? (
+        <ActivityIndicator style={styles.fill} size="large" />
+      ) : error ? (
+        <View style={[styles.fill, styles.centered]}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={loadSpots} style={styles.retry}><Text style={styles.retryText}>Retry</Text></Pressable>
+        </View>
+      ) : view === "map" ? (
+        <MapView style={styles.fill} initialRegion={UCR_REGION}>
+          {spots.map((s) => {
+            const b = busynessOf(s);
+            return (
+              <Marker
+                key={s.id}
+                coordinate={{ latitude: s.latitude, longitude: s.longitude }}
+                title={s.name}
+                description={`${b.label}${b.age ? " · " + b.age : ""} (tap for details)`}
+                pinColor={b.color}
+                onCalloutPress={() => setSelected(s)}
+              />
+            );
+          })}
+        </MapView>
+      ) : (
+        <FlatList
+          data={spots}
+          keyExtractor={(s) => String(s.id)}
+          renderItem={({ item }) => (
+            <Pressable style={styles.row} onPress={() => setSelected(item)}>
+              <Text style={styles.rowName}>{item.name}</Text>
+              <BusyBadge spot={item} />
+              <Text style={styles.rowSub}>{item.description}</Text>
+            </Pressable>
+          )}
+          ListEmptyComponent={<Text style={styles.empty}>No spots match these filters.</Text>}
+        />
+      )}
+
+      <Modal visible={!!selected} animationType="slide" onRequestClose={() => setSelected(null)}>
+        <SafeAreaView style={styles.detail}>
+          {selected && (
+            <ScrollView contentContainerStyle={styles.detailBody}>
+              <Text style={styles.title}>{selected.name}</Text>
+              <BusyBadge spot={selected} />
+              <Text style={styles.desc}>{selected.description}</Text>
+              <View style={styles.tags}>
+                {spotTags(selected).map((t) => <Text key={t} style={styles.tag}>{t}</Text>)}
+              </View>
+
+              <Text style={styles.sectionTitle}>How busy is it right now?</Text>
+              <Text style={styles.hint}>You need to be within about {MAX_REPORT_METERS} m of the spot to report.</Text>
+              <View style={styles.reportRow}>
+                {Object.entries(BUSYNESS).map(([key, info]) => (
+                  <Pressable
+                    key={key}
+                    style={[styles.reportBtn, { borderColor: info.color }, reporting && { opacity: 0.5 }]}
+                    onPress={() => reportBusyness(key)}
+                    disabled={reporting}
+                  >
+                    <Text style={[styles.reportText, { color: info.color }]}>{info.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {reporting && <ActivityIndicator style={{ marginTop: 12 }} />}
+            </ScrollView>
+          )}
+          <Pressable style={styles.close} onPress={() => setSelected(null)}>
+            <Text style={styles.closeText}>Close</Text>
+          </Pressable>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const BLUE = "#2563eb";
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "white" },
+  fill: { flex: 1 },
+  centered: { justifyContent: "center", alignItems: "center", padding: 24 },
+  chipScroll: { flexGrow: 0 },
+  chipRow: { paddingHorizontal: 12, paddingVertical: 10 },
+  chip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: BLUE, marginRight: 8 },
+  chipOn: { backgroundColor: BLUE },
+  chipText: { color: BLUE },
+  chipTextOn: { color: "white", fontWeight: "600" },
+  toggle: { flexDirection: "row", marginHorizontal: 12, marginBottom: 8, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: BLUE },
+  tab: { flex: 1, padding: 8, alignItems: "center" },
+  tabOn: { backgroundColor: BLUE },
+  tabText: { color: BLUE },
+  tabTextOn: { color: "white", fontWeight: "600" },
+  errorText: { fontSize: 15, textAlign: "center", marginBottom: 12 },
+  retry: { paddingVertical: 8, paddingHorizontal: 20, backgroundColor: BLUE, borderRadius: 8 },
+  retryText: { color: "white", fontWeight: "600" },
+  row: { padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#ccc" },
+  rowName: { fontSize: 16, fontWeight: "600" },
+  rowSub: { fontSize: 14, color: "#555", marginTop: 4 },
+  empty: { padding: 24, textAlign: "center", color: "#555" },
+  badge: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginRight: 6 },
+  badgeText: { fontSize: 14, color: "#333" },
+  tags: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
+  tag: { backgroundColor: "#e5edff", paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, marginRight: 8, marginBottom: 8, fontSize: 13 },
+  detail: { flex: 1, backgroundColor: "white" },
+  detailBody: { padding: 16 },
+  title: { fontSize: 24, fontWeight: "700" },
+  desc: { fontSize: 16, color: "#444", marginTop: 8 },
+  sectionTitle: { fontSize: 17, fontWeight: "700", marginTop: 20 },
+  hint: { fontSize: 13, color: "#666", marginTop: 4, marginBottom: 10 },
+  reportRow: { flexDirection: "row", justifyContent: "space-between" },
+  reportBtn: { flex: 1, marginHorizontal: 4, paddingVertical: 12, borderWidth: 2, borderRadius: 8, alignItems: "center" },
+  reportText: { fontWeight: "700" },
+  close: { margin: 16, padding: 12, borderRadius: 8, backgroundColor: BLUE, alignItems: "center" },
+  closeText: { color: "white", fontWeight: "600" },
+});
