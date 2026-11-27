@@ -59,7 +59,7 @@ class AccountActionTests(TestCase):
             self.client.force_authenticate(actor)
             for action in ["suspend", "ban", "restore"]:
                 with self.subTest(actor=actor, action=action):
-                    self.assertEqual(self.action(action).status_code, 403)
+                    self.assertEqual(self.action(action).status_code, 401 if actor is None else 403)
         self.assertFalse(AccountModerationAction.objects.exists())
 
     def test_inactive_or_restricted_admin_is_denied_even_with_stale_credentials(self):

@@ -17,11 +17,11 @@ Public, read-only database connectivity check. Successful response: HTTP 200.
 
 POST and other write methods return HTTP 405. Database failures result in a server error; the endpoint does not claim readiness if the database cannot be queried.
 
-Django admin is available separately at `/admin/` and uses Django session authentication. There are no mobile authentication endpoints yet. The profile endpoint requires authentication through the configured DRF authenticators. Mobile login and credential transport remain pending; these endpoints do not implement or select a mobile token scheme.
+Django admin is available separately at `/admin/` and uses Django session authentication. Mobile requests use JWT bearer authentication. DRF also retains session/basic authentication for existing development clients; use HTTPS outside local development.
 
 ## Reserved feature prefixes
 
-These URL includes define feature ownership. Accounts implements `me/` and moderation implements the account actions below; other feature endpoints remain pending:
+These URL includes define feature ownership. Accounts implements signup/login, retained Google routes, and `me/`; moderation implements the account actions below; other feature endpoints remain pending:
 
 | Prefix | Owner app | Scope |
 | --- | --- | --- |
@@ -38,17 +38,106 @@ Resolve and document UCR email ownership verification, unknown versus always-acc
 
 ## Account field alignment
 
-The separate authentication branch targets email/password login with JWT bearer
-tokens and signup with `username`, `email`, and `password`. That implementation
-is not included in this profile branch. Its username is a display name and
-email is its login identifier; this profile feature does not change that design.
+Mobile signup accepts `username`, `email`, and `password`; email identifies login
+and username remains an editable display name. Nonblank emails are unique
+case-insensitively in the database. Signup normalizes email to lowercase.
 First and last names are optional profile fields, each up to 150 characters;
 signup does not need to collect them. There is no `full_name` field.
 
 The existing `study_preferences` field is the profile bio/description, matching
 the frontend input. There are no separate `bio` or `description` fields. Email changes, UCR ownership verification, and photo uploads remain
-pending. Domain validation is not ownership verification. No OAuth provider is
-implemented by this profile feature.
+pending. Domain validation is not ownership verification. Google backend endpoints are retained below, but mobile Google entry points are deferred.
+
+## Signup and login
+
+### POST `/accounts/signup/`
+
+Public; ignores any stale Authorization header. Request:
+
+```json
+{"username": "scotty", "email": "scotty@ucr.edu", "password": "a-strong-private-password"}
+```
+
+HTTP 201:
+
+```json
+{"message": "Account created successfully.", "user": {"id": 1, "username": "scotty", "email": "scotty@ucr.edu"}}
+```
+
+Username follows Django's username validator (unique, maximum 150 characters).
+Email must be a valid `@ucr.edu` address, is trimmed/lowercased, and must be unique
+case-insensitively. Password whitespace is preserved; Django's configured length,
+common-password, numeric-password, and user-similarity checks apply. Passwords are
+hashed and never returned. A successful signup does not authenticate the caller,
+create a profile, or verify UCR email ownership. The mobile app returns to login.
+
+HTTP 400 covers missing/invalid fields and duplicate email/username, including
+signup races. Field errors map to message arrays, for example:
+`{"email": ["An account with this email already exists."]}`.
+Object-level errors use `non_field_errors`. No pagination applies.
+
+### POST `/accounts/login/`
+
+Public; ignores stale Authorization headers. Request:
+
+```json
+{"email": "scotty@ucr.edu", "password": "a-strong-private-password"}
+```
+
+HTTP 200:
+
+```json
+{"access": "<access-jwt>", "refresh": "<refresh-jwt>", "user": {"id": 1, "username": "scotty", "email": "scotty@ucr.edu"}}
+```
+
+Email matching is case-insensitive; password whitespace is significant. Unknown
+email, incorrect password, or manually disabled user returns 400 with
+`{"non_field_errors": ["Invalid email or password."]}`. A suspended/banned user
+with correct credentials returns 403 with `detail`; expired suspensions and
+restored accounts may log in. Validation errors use field arrays.
+
+Send `Authorization: Bearer <access>` to protected endpoints. Access tokens use
+SimpleJWT's five-minute lifetime. To keep this integration scoped, automatic
+refresh is deferred: the existing response's refresh token is retained but there
+is no refresh endpoint. The mobile client clears stored tokens and returns to
+login on a protected 401. It does not attach old tokens to public signup/login.
+Native tokens use SecureStore; browser tokens are in memory and reset on reload.
+Profile has a local logout action that clears tokens; there is no server-side
+logout/revocation endpoint, so a copied access token remains usable until expiry
+unless account restrictions block it. Never log or commit tokens.
+
+All auth POST routes return 405 for unsupported methods and 415 for unsupported
+content types; malformed JSON returns 400. No list pagination applies.
+
+### Retained Google backend routes (mobile UI deferred)
+
+The original Google implementation remains for follow-up work. Mobile Google
+buttons/linking are disabled, and the native Google module is loaded only when
+that feature is explicitly enabled in code. Completing the native config plugin,
+iOS URL scheme/client setup, and development-build verification is required before
+enabling it; it cannot run in Expo Go. Ordinary signup/login works in Expo Go.
+
+- POST `/accounts/google/`: public, body `{"id_token": "<google-id-token>"}`.
+  Requires backend `GOOGLE_WEB_CLIENT_ID`. The token is verified against that
+  audience, and must carry a subject and a verified `@ucr.edu` email. An existing
+  linked identity must match the stored email and be active/unrestricted. New
+  identities create a user with an unusable password and one GoogleIdentity row
+  atomically. HTTP 200 returns the same tokens/user shape as password login.
+  Email matches alone never automatically link an existing local account.
+- POST `/accounts/google/link/`: requires JWT authentication and an unrestricted
+  account, body `{"id_token": "<google-id-token>", "password": "<local-password>"}`.
+  Requires the correct local password and a verified Google email matching the
+  caller. HTTP 200 returns `message` and, for a newly created link, `user`.
+  Repeating the same link returns 200 with a message and creates no extra row.
+
+Google routes return 400 for missing token/password, 401 for invalid Google tokens
+(or missing/invalid JWT on linking), 403 for unverified/non-UCR/mismatching email,
+incorrect/unusable local password, disabled or restricted account, 409 for an
+existing local email requiring explicit linking, conflicting identity, or a
+concurrent creation/link conflict, and 503 if Google configuration is absent.
+Provider errors use `error`; authentication/permission failures use `detail`.
+UCR ownership verification policy remains unresolved: neither password signup nor
+the retained Google routes marks `UserProfile.email_verified_at`.
 
 ## Current user profile
 
@@ -91,7 +180,7 @@ so for this endpoint to work.
 
 | Field | Update rules |
 | --- | --- |
-| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). User ID and ownership stay the same. The separate email-login implementation uses email rather than username; under the current development basic authentication, credentials still use the updated username. |
+| `username` | Nonblank string; max 150 characters; unique using the existing database's comparison rules; Django Unicode username validator (letters, numbers, and `@ . + - _`). User ID and ownership stay the same. Mobile login uses email rather than username; development basic authentication still uses the updated username. |
 | `first_name`, `last_name` | Strings up to 150 characters; empty strings allowed. |
 | `study_preferences` | Profile bio/description shown as "Study preferences" in the frontend. String; no API length limit; empty string allowed. |
 | `email` | Read-only; including it in PATCH returns 400, even if unchanged. |
@@ -112,21 +201,17 @@ Validation failures use field names mapped to arrays of messages, for example:
 | --- | --- |
 | 200 | Successful read or partial update. |
 | 400 | Invalid fields, duplicate username, non-object body, or malformed JSON. Non-field errors use `non_field_errors`; parse errors use `detail`. |
-| 403 | Unauthenticated with the current DRF default authenticator ordering, or session-authenticated writes without valid CSRF. A future mobile authenticator may instead return 401 with its authentication challenge. |
+| 401 | Missing, invalid, or expired credentials; includes a Bearer authentication challenge. |
+| 403 | Disabled/restricted account or session-authenticated write without valid CSRF. |
 | 405 | Unsupported method (POST, PUT, DELETE); GET, PATCH, HEAD, and OPTIONS are supported. |
 | 415 | Unsupported request content type. Send JSON for PATCH. |
 
-Current authentication is inherited from DRF defaults (session and basic).
-Session-authenticated PATCH requests require CSRF. The separate authentication feature
-will configure its mobile authenticator globally when integrated; this view uses
-`request.user` and needs no user identifier from the client. Login/signup and
-UCR verification remain outside this profile implementation.
+Authentication uses `Authorization: Bearer <access>`. Session/basic authentication
+remains available; session-authenticated PATCH requires CSRF. UCR email ownership
+verification is pending and is not implied by successful signup/login.
 
-The mobile profile screen still uses its in-memory adapter until the mobile
-credential flow is ready. Replace `getProfile`/`updateProfile` internals with
-GET/PATCH calls to this route using those credentials; do not send the full
-GET object back as PATCH because email is read-only. Frontend validation is
-for feedback; API validation is authoritative.
+The mobile profile adapter now calls GET/PATCH with the stored bearer token.
+Only editable fields are sent on PATCH; email stays read-only.
 
 ### Read and edit the profile bio/description
 
@@ -149,9 +234,7 @@ truth. Existing authentication and ownership rules apply.
 
 The frontend's existing multiline field is labeled "Study preferences"
 and continues to use the same `study_preferences` key in `getProfile()` and
-`updateProfile()`. It still uses the in-memory adapter until mobile credentials
-and real profile requests are integrated; saving in the app currently does not
-exercise these backend endpoints.
+`updateProfile()`. It uses the authenticated profile adapter; saved changes persist in the backend.
 
 ## Admin account moderation
 
@@ -162,7 +245,7 @@ access out of band; these endpoints never grant privileges. A superuser must
 also have `is_staff=true`. No extra moderator group is required.
 
 All paths below are relative to `/api/v1/`. POST JSON only; session-authenticated
-writes require CSRF. Current session/basic authentication is unchanged.
+writes require CSRF. JWT bearer, session, and basic authentication are supported.
 
 | Method/path | JSON body | Result |
 | --- | --- | --- |
@@ -215,7 +298,8 @@ not automatically cancelled; those lifecycle decisions remain pending.
 | --- | --- |
 | 200 | Action applied or valid no-op. |
 | 400 | Missing/invalid fields, invalid expiry, non-object body, or malformed JSON. Field errors map to arrays; parse errors use `detail`. |
-| 403 | Anonymous under current authenticator ordering; non-admin, disabled/restricted actor, protected target, or missing session CSRF. Permission errors use `detail`. Future mobile authentication may return 401 for missing credentials. |
+| 401 | Missing, invalid, or expired credentials; includes a Bearer authentication challenge. |
+| 403 | Non-admin, disabled/restricted actor, protected target, or missing session CSRF. Permission errors use `detail`. |
 | 404 | Target user does not exist. |
 | 405 | Unsupported method; only POST and OPTIONS are supported. |
 | 409 | Cannot suspend a banned account; error uses `detail`. |
@@ -224,11 +308,10 @@ not automatically cancelled; those lifecycle decisions remain pending.
 `moderation.permissions.IsUnrestrictedUser` is the default DRF permission and
 is also explicitly used by the current profile endpoint. It checks fresh user
 flags and the latest moderation action on every protected request, so existing
-session/basic credentials lose API access immediately after restriction and
+JWT/session/basic credentials lose API access immediately after restriction and
 can work again after expiry/restoration. The public health endpoint remains
 accessible. Views that override permissions must retain this check when they
-require unrestricted accounts; future JWT integration must enforce it for
-protected requests and check account state when issuing/refreshing tokens.
+require unrestricted accounts; JWT login checks account state before issuing tokens. Refresh is deferred; any future refresh endpoint must repeat that check.
 These actions do not implement login, credential revocation, or an appeal API.
 
 The audit history is read-only in Django admin. The report queue, report review

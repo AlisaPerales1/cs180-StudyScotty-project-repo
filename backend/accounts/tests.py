@@ -128,8 +128,8 @@ class ProfileEndpointTests(TestCase):
 
     def test_anonymous_requests_are_rejected(self):
         self.client.force_authenticate(user=None)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
-        self.assertEqual(self.client.patch(self.url, {"first_name": "Changed"}, format="json").status_code, 403)
+        self.assertEqual(self.client.get(self.url).status_code, 401)
+        self.assertEqual(self.client.patch(self.url, {"first_name": "Changed"}, format="json").status_code, 401)
         self.user.refresh_from_db()
         self.assertEqual(self.user.first_name, "Scotty")
 
@@ -157,7 +157,7 @@ class ProfileEndpointTests(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Basic {credentials}")
         response = self.client.patch(self.url, {"username": "renamed"}, format="json")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.get(self.url).status_code, 401)
         credentials = b64encode(b"renamed:test-password-482!").decode()
         self.client.credentials(HTTP_AUTHORIZATION=f"Basic {credentials}")
         self.assertEqual(self.client.get(self.url).json()["username"], "renamed")

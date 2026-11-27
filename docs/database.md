@@ -2,18 +2,18 @@
 
 ## Implemented schema
 
-The backend implements the 15 domain tables in the supplied [ERD](erd.dbml), plus an account moderation action history table (16 total). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
+The backend implements the 15 domain tables in the supplied [ERD](erd.dbml), plus account moderation action history and Google identity tables (17 total). Django models and migrations are the executable schema. DBML names are conceptual; Django uses app-prefixed table names such as `spots_spot`.
 
 | App | Models | Main relationships |
 | --- | --- | --- |
-| accounts | User, UserProfile, Course, UserCourse | One profile per user; unique user/course membership |
+| accounts | User, UserProfile, Course, UserCourse, GoogleIdentity | One profile and Google identity per user; unique user/course membership |
 | spots | Spot, SpotPhoto, OpeningHours, Review, Favorite, BusynessReport | Spot creator, photo uploader, review author, favorites, and busyness reporter |
 | study_sessions | StudySession, RSVP, SessionCheckIn | Session creator/spot/course; unique session/user RSVP; optional check-in busyness report |
 | moderation | AbuseReport, SessionCreationRestriction, AccountModerationAction | Session reports, reporters/reviewers, creation restrictions, and account action history |
 
 All relationships to users use `settings.AUTH_USER_MODEL`. Django's built-in auth, group, permission, admin, and login-session tables also exist. They are omitted from the ERD.
 
-`User` retains `AbstractUser` and username/password login. Email is now required by model/admin validation, without introducing email uniqueness or enforcing a UCR domain. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile. The profile API reads a missing profile as empty study preferences and creates the row on a valid preferences update. Profile updates do not change the schema.
+`User` retains `AbstractUser`. Mobile login uses email/password; admin and development basic authentication still use username/password. Email is required by model/admin validation. Migration `0004_unique_login_email` adds a unique index on `Lower(email)` for nonblank emails, preventing concurrent/case-variant duplicates. Signup trims and lowercases email and enforces `@ucr.edu`; domain validation is not ownership verification. Legacy blank emails remain allowed at the database level so existing users and developer fixtures are not rewritten. Existing users are not rewritten or automatically verified. Passwords use Django hashing. Profiles are explicit one-to-one records; creating a user does not automatically create a profile. The profile API reads a missing profile as empty study preferences and creates the row on a valid preferences update. Profile updates do not change the schema.
 
 Optional text uses empty strings following Django conventions, including inherited first/last names, descriptions, storage keys, comments, and cancellation reasons. Unknown noise and amenity values remain SQL NULL, as in the ERD. Photos are storage references; no upload provider is configured.
 
@@ -126,7 +126,7 @@ Most domain models remain storage scaffolds; the profile and admin account actio
 
 ## Decisions still pending
 
-- UCR ownership verification, email login/uniqueness, and blank emails on any existing accounts.
+- UCR ownership verification and remediation of blank emails on existing accounts; mobile email login and nonblank case-insensitive email uniqueness are implemented.
 - Whether reviews are limited to one per user per spot; no such unique constraint is currently imposed.
 - One-hour versus two-hour busyness freshness; callers must specify expiry.
 - Whether the one-active/upcoming-session limit applies to creation, participation, or both.
@@ -144,3 +144,23 @@ python manage.py test
 ```
 
 Tests exercise database constraints, relationship uniqueness, deletion protection/cascades, linked check-in model validation, and SQLite/PostgreSQL connection URL parsing. Live PostgreSQL verification requires a provisioned server and has not been performed as part of local SQLite setup.
+
+## Authentication integration migrations
+
+`GoogleIdentity` (migration `0003_googleidentity`) has an auto primary key, a
+required unique `google_sub` (maximum 255 characters), a required unique one-to-one
+`user` FK, and an automatic `created_at`. Deleting a user cascades to its identity;
+deleting an identity does not delete the user. Google creation/linking is atomic.
+The identity is visible as read-only fields in Django admin; mobile Google
+entry points remain deferred until native setup is complete. No profile is
+automatically created or marked verified by authentication.
+
+Migration `0004_unique_login_email` first checks existing nonblank emails for
+case-insensitive duplicates. It stops with an explicit error rather than merging,
+deleting, or rewriting accounts. Resolve duplicate ownership explicitly before
+rerunning `python manage.py migrate`; back up deployed data first. The constraint
+and GoogleIdentity are schema changes proposed by this PR and require PR review.
+The API maps a concurrent email or username collision to a 400 field error.
+JWTs are signed credentials, not database rows; automatic token refresh and
+server-side logout/revocation are deferred. Moderation restrictions apply to token
+issuance and every protected request, independently of the manual `is_active` flag.

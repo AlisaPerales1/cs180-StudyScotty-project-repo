@@ -1,12 +1,21 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
 
 
 class User(AbstractUser):
-    """Username login is retained until the UCR verification policy is agreed."""
+    """Email identifies mobile logins; ownership verification remains pending."""
 
     email = models.EmailField(max_length=254)
+
+    class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"), condition=~models.Q(email=""),
+                name="unique_user_email_case_insensitive",
+            ),
+        ]
 
 
 class UserProfile(models.Model):
@@ -40,3 +49,22 @@ class UserCourse(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user", "course"], name="unique_user_course"),
         ]
+
+class GoogleIdentity(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="google_identity",
+    )
+
+    google_sub = models.CharField(
+        max_length=255,
+        unique=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    def __str__(self):
+        return f"Google identity for {self.user.username}"
