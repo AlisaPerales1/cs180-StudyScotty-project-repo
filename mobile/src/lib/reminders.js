@@ -107,6 +107,8 @@ async function ensurePermission() {
     // Android 13+ only shows the permission prompt once a channel exists.
     await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
       name: 'Opening reminders',
+      // SDK 58 exports this enum; eslint's namespace resolver misses the re-export.
+      // eslint-disable-next-line import/namespace
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
