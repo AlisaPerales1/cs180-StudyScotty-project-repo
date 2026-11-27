@@ -7,6 +7,14 @@ import { getAccessToken } from '../api/tokenStorage';
 
 configureNotifications();
 
+// SDK 58 redirects away from href: null tabs. Hide only the button so these
+// routes remain reachable through redirects, links, and programmatic navigation.
+/** @type {import('expo-router/js-tabs').TabsScreenOptions} */
+const hiddenTabOptions = {
+  tabBarButton: () => null,
+  tabBarItemStyle: { display: 'none' },
+};
+
 export default function RootLayout() {
   const pathname = usePathname();
 
@@ -27,14 +35,14 @@ export default function RootLayout() {
       <StatusBar style="dark" />
 
       <Tabs
-        initialRouteName="login"
+        id="root"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: '#2463a0',
         }}
       >
-        <Tabs.Screen name="index" options={{ href: null }} />
-        <Tabs.Screen name="link-google" options={{ href: null }} />
+        <Tabs.Screen name="index" options={hiddenTabOptions} />
+        <Tabs.Screen name="link-google" options={hiddenTabOptions} />
         <Tabs.Screen
           name="discovery"
           options={{ title: 'Discovery' }}
@@ -58,7 +66,7 @@ export default function RootLayout() {
         <Tabs.Screen
           name="login"
           options={{
-            href: null,
+            ...hiddenTabOptions,
             tabBarStyle: { display: 'none' },
           }}
         />
@@ -66,19 +74,19 @@ export default function RootLayout() {
         <Tabs.Screen
           name="signup"
           options={{
-            href: null,
+            ...hiddenTabOptions,
             tabBarStyle: { display: 'none' },
           }}
         />
 
         <Tabs.Screen
           name="spots/[id]/index"
-          options={{ href: null }}
+          options={hiddenTabOptions}
         />
 
         <Tabs.Screen
           name="spots/[id]/reviews"
-          options={{ href: null }}
+          options={hiddenTabOptions}
         />
       </Tabs>
     </>
